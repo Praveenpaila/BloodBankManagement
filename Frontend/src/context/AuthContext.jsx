@@ -1,102 +1,89 @@
-import React, { createContext, useState, useEffect } from 'react';
-import axios from 'axios';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
+import api from '../api/axios';
 
-// Configure axios base URL
-axios.defaults.baseURL = 'http://localhost:3000/api/auth';
+export const AuthContext = createContext(null);
 
-export const AuthContext = createContext();
-
-const cleanContactFields = (data) => ({
-  ...data,
-  email: data.email?.trim(),
-  phoneNumber: data.phoneNumber?.trim(),
-});
+const dashboardFor = (role) => {
+  if (role === 'admin') return '/admin/dashboard';
+  if (role === 'hospital') return '/hospital/dashboard';
+  return '/donor/dashboard';
+};
 
 export const AuthProvider = ({ children }) => {
-  const [token, setToken] = useState(localStorage.getItem('token') || null);
-  const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('token'));
-  const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
+  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(localStorage.getItem('token') || '');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (token) {
-      localStorage.setItem('token', token);
-      setIsAuthenticated(true);
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    } else {
-      localStorage.removeItem('token');
-      setIsAuthenticated(false);
-      delete axios.defaults.headers.common['Authorization'];
-    }
+    const loadUser = async () => {
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const { data } = await api.get('/auth/me');
+        setUser(data.data);
+      } catch {
+        localStorage.removeItem('token');
+        setToken('');
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadUser();
   }, [token]);
 
-  const login = async (credentials) => {
-    setIsLoading(true);
-    try {
-      const res = await axios.post('/login', cleanContactFields(credentials));
-      if (res.data.success) {
-        setToken(res.data.token);
-        return { success: true };
-      }
-      return { success: false, message: res.data.message };
-    } catch (err) {
-      return { 
-        success: false, 
-        message: err.response?.data?.message || 'Login failed' 
-      };
-    } finally {
-      setIsLoading(false);
-    }
+  const login = async (email, password) => {
+    const { data } = await api.post('/auth/login', { email, password });
+    localStorage.setItem('token', data.token);
+    setToken(data.token);
+    setUser(data.user);
+    toast.success('Logged in successfully');
+    return data.user.role;
   };
 
-  const signup = async (userData) => {
-    setIsLoading(true);
-    try {
-      const res = await axios.post('/signup', cleanContactFields(userData));
-      if (res.data.success) {
-        setToken(res.data.token);
-        return { success: true };
-      }
-      return { success: false, message: res.data.message };
-    } catch (err) {
-      return { 
-        success: false, 
-        message: err.response?.data?.message || 'Signup failed' 
-      };
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const sendOtp = async (contactData) => {
-    setIsLoading(true);
-    try {
-      const res = await axios.post('/sendOtp', cleanContactFields(contactData));
-      return { success: res.data.success, message: res.data.message };
-    } catch (err) {
-      return { 
-        success: false, 
-        message: err.response?.data?.message || 'Failed to send OTP' 
-      };
-    } finally {
-      setIsLoading(false);
-    }
+  const register = async (payload) => {
+    const { data } = await api.post('/auth/signup', payload);
+    localStorage.setItem('token', data.token);
+    setToken(data.token);
+    setUser(data.user);
+    toast.success('Account created');
+    return data.user.role;
   };
 
   const logout = () => {
-    setToken(null);
+    localStorage.removeItem('token');
+    setToken('');
+    setUser(null);
+    navigate('/login');
   };
 
-  return (
-    <AuthContext.Provider value={{
+  const updateUser = (updates) => {
+    setUser((current) => ({ ...current, ...updates }));
+  };
+
+  const value = useMemo(
+    () => ({
+      user,
       token,
-      isAuthenticated,
-      isLoading,
+      loading,
+      isAuthenticated: Boolean(token && user),
       login,
-      signup,
-      sendOtp,
-      logout
-    }}>
-      {children}
-    </AuthContext.Provider>
+      logout,
+      register,
+      updateUser,
+      dashboardFor,
+    }),
+    [user, token, loading],
   );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
+
+export const useAuth = () => useContext(AuthContext);

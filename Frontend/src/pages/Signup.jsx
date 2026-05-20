@@ -22,7 +22,7 @@ export default function Signup() {
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   
-  const { signup, sendOtp, isLoading } = useContext(AuthContext);
+  const { signup, sendOtp, resendOtp, isLoading } = useContext(AuthContext);
   const navigate = useNavigate();
 
   const handleChange = (e) => {
@@ -60,6 +60,25 @@ export default function Signup() {
       navigate('/dashboard');
     } else {
       setError(res.message);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    const { email, phoneNumber } = formData;
+
+    if (!email || !phoneNumber) {
+      setError('Email and phone number are required to resend OTP');
+      return;
+    }
+
+    const res = await resendOtp({ email, phoneNumber });
+    if (res.success) {
+      setFormData({ ...formData, otp: '' });
+      setSuccessMsg('A new OTP has been sent to your email');
+      setError('');
+    } else {
+      setError(res.message);
+      setSuccessMsg('');
     }
   };
 
@@ -178,6 +197,16 @@ export default function Signup() {
             
             <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '1rem' }} disabled={isLoading}>
               {isLoading ? 'Verifying...' : 'Verify & Register'}
+            </button>
+
+            <button
+              type="button"
+              className="btn btn-outline"
+              style={{ width: '100%', marginTop: '1rem' }}
+              onClick={handleResendOtp}
+              disabled={isLoading}
+            >
+              {isLoading ? 'Sending...' : 'Resend OTP'}
             </button>
             
             <button 
