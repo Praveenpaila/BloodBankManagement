@@ -67,6 +67,10 @@ const bloodRequestSchema = new mongoose.Schema(
         },
       },
     ],
+    acceptedDonor: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
     fulfilledAt: Date,
   },
   { timestamps: true },

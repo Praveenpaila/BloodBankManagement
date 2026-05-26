@@ -1,6 +1,6 @@
 import Navbar from './Navbar';
 import Sidebar from './Sidebar';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/authStore';
 
 const DashboardLayout = ({ title, subtitle, children }) => {
   const { user } = useAuth();

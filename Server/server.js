@@ -7,9 +7,13 @@ const helmet = require("helmet");
 const morgan = require("morgan");
 const rateLimit = require("express-rate-limit");
 const mongoSanitize = require("express-mongo-sanitize");
+const http = require("http");
+const { initRealtime } = require("./utils/realtime");
 
 const app = express();
 const port = process.env.PORT || 5000;
+const server = http.createServer(app);
+initRealtime(server);
 
 app.use(cors({ origin: process.env.CLIENT_URL || true, credentials: true }));
 app.use(helmet());
@@ -42,6 +46,7 @@ app.use("/api/notifications", require("./routes/notificationRoutes"));
 app.use("/api/donors", require("./routes/donorRoutes"));
 app.use("/api/hospitals", require("./routes/hospitalRoutes"));
 app.use("/api/appointments", require("./routes/appointmentRoutes"));
+app.use("/api/chats", require("./routes/chatRoutes"));
 
 app.get("/api/health", (req, res) => {
   res.status(200).json({ success: true, message: "BloodLink API is running" });
@@ -57,6 +62,6 @@ mongoose
   .then(() => console.log("Connected to MongoDB successfully"))
   .catch((err) => console.error("MongoDB connection error:", err));
 
-app.listen(port, () => {
+server.listen(port, () => {
   console.log(`Server is running successfully on port ${port}`);
 });

@@ -1,5 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
-import { useAuth } from './context/AuthContext';
+import { useAuth } from './context/authStore';
 import ProtectedRoute from './components/common/ProtectedRoute';
 import LandingPage from './pages/public/LandingPage';
 import AboutPage from './pages/public/AboutPage';
@@ -13,6 +13,7 @@ import {
   BloodInventory,
   BookAppointment,
   BroadcastAlerts,
+  ChatPage,
   DonorAnalytics,
   DonorDashboard,
   DonorProfile,
@@ -66,6 +67,8 @@ function App() {
       <Route path="/donor/badges" element={<Protected role="donor"><BadgesPage /></Protected>} />
       <Route path="/donor/notifications" element={<Protected role="donor"><NotificationsPage /></Protected>} />
       <Route path="/donor/nearby-requests" element={<Protected role="donor"><NearbyRequestsPage /></Protected>} />
+      <Route path="/donor/sos" element={<Protected role="donor"><RaiseRequest /></Protected>} />
+      <Route path="/donor/chat/:requestId" element={<Protected role="donor"><ChatPage /></Protected>} />
 
       <Route path="/hospital/dashboard" element={<Protected role="hospital"><HospitalDashboard /></Protected>} />
       <Route path="/hospital/inventory" element={<Protected role="hospital"><BloodInventory /></Protected>} />
@@ -75,6 +78,7 @@ function App() {
       <Route path="/hospital/expiry-alerts" element={<Protected role="hospital"><ExpiryAlerts /></Protected>} />
       <Route path="/hospital/profile" element={<Protected role="hospital"><HospitalProfile /></Protected>} />
       <Route path="/hospital/notifications" element={<Protected role="hospital"><HospitalNotifications /></Protected>} />
+      <Route path="/hospital/chat/:requestId" element={<Protected role="hospital"><ChatPage /></Protected>} />
 
       <Route path="/admin/dashboard" element={<Protected role="admin"><AdminDashboard /></Protected>} />
       <Route path="/admin/users" element={<Protected role="admin"><UserManagement /></Protected>} />

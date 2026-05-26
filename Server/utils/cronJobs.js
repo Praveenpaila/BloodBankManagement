@@ -7,6 +7,7 @@ const DonationHistory = require("../models/DonationHistory");
 const { awardPoints } = require("../controllers/loyaltyController");
 const { transporter } = require("../controllers/auth");
 const { findNearbyDonors } = require("../controllers/bloodRequestController");
+const { emitToUser } = require("./realtime");
 
 cron.schedule("0 8 * * *", async () => {
   try {
@@ -103,26 +104,39 @@ cron.schedule("*/30 * * * *", async () => {
     });
 
     for (const request of requests) {
-      const donors = await findNearbyDonors(
-        request.bloodGroup,
-        request.location.coordinates,
-        request.radiusKm,
-        request.notifiedDonors,
-      ).limit(5);
+      const donors = (
+        await findNearbyDonors(
+          request.bloodGroup,
+          request.location.coordinates,
+          request.radiusKm,
+          request.notifiedDonors,
+        )
+      ).slice(0, 5);
 
       if (donors.length === 0) {
         continue;
       }
 
-      await Notification.insertMany(
+      const notifications = await Notification.insertMany(
         donors.map((donor) => ({
           recipient: donor._id,
           type: "blood_request",
-          title: `${request.bloodGroup} blood needed`,
+          title: `${request.urgency === "critical" ? "SOS: " : ""}${request.bloodGroup} blood needed`,
           message: "A nearby blood request still needs donors.",
-          data: { requestId: request._id },
+          data: {
+            requestId: request._id,
+            urgency: request.urgency,
+            bloodGroup: request.bloodGroup,
+            escalated: true,
+          },
         })),
       );
+
+      notifications.forEach((notification) => {
+        if (notification?.recipient) {
+          emitToUser(notification.recipient, "blood-request:new", notification);
+        }
+      });
 
       request.notifiedDonors.push(...donors.map((donor) => donor._id));
       await request.save();

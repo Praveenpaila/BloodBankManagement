@@ -2,7 +2,12 @@ const axios = require("axios");
 const BloodRequest = require("../models/BloodRequest");
 const UserModel = require("../models/user");
 const Notification = require("../models/Notification");
+const ChatConversation = require("../models/ChatConversation");
 const { transporter } = require("./auth");
+const { emitToUser } = require("../utils/realtime");
+const { deferDonorAfterDonation } = require("../utils/eligibilityDeferral");
+const { rankDonorsByShortestPath } = require("../utils/geoRouting");
+const { bloodGroupFilterFor, compatibleDonorGroupsFor } = require("../utils/bloodCompatibility");
 
 const getDistanceInfo = async (origin, destinations) => {
   if (!process.env.GOOGLE_MAPS_API_KEY || destinations.length === 0) {
@@ -34,9 +39,16 @@ const getDistanceInfo = async (origin, destinations) => {
 };
 
 const findNearbyDonors = async (bloodGroup, coordinates, radiusKm, excludeIds = []) => {
+  const radius = Math.max(Number(radiusKm) || 10, 1);
+  const compatibleBloodGroups = compatibleDonorGroupsFor(bloodGroup);
+
+  if (compatibleBloodGroups.length === 0) {
+    return [];
+  }
+
   return UserModel.find({
     role: "donor",
-    bloodGroup,
+    bloodGroup: bloodGroupFilterFor(bloodGroup),
     isActive: true,
     isEligible: true,
     _id: { $nin: excludeIds },
@@ -46,7 +58,7 @@ const findNearbyDonors = async (bloodGroup, coordinates, radiusKm, excludeIds = 
           type: "Point",
           coordinates,
         },
-        $maxDistance: Number(radiusKm || 10) * 1000,
+        $maxDistance: radius * 1000,
       },
     },
   }).select("-password");
@@ -57,10 +69,13 @@ exports.createRequest = async (req, res) => {
     const { bloodGroup, unitsNeeded, urgency = "normal", lat, lng, radiusKm = 10, notes } =
       req.body;
 
-    if (!bloodGroup || !unitsNeeded) {
+    const requestedUnits = Number(unitsNeeded);
+    const requestedRadius = Math.max(Number(radiusKm) || 10, 1);
+
+    if (!bloodGroup || !Number.isFinite(requestedUnits) || requestedUnits < 1) {
       return res.status(400).json({
         success: false,
-        message: "Provide blood group and units needed",
+        message: "Provide blood group and valid units needed",
       });
     }
 
@@ -69,23 +84,30 @@ exports.createRequest = async (req, res) => {
         ? [Number(lng), Number(lat)]
         : req.user.location?.coordinates;
 
-    if (!coordinates?.length) {
+    if (
+      !coordinates?.length ||
+      coordinates.length < 2 ||
+      !Number.isFinite(coordinates[0]) ||
+      !Number.isFinite(coordinates[1])
+    ) {
       return res.status(400).json({
         success: false,
         message: "Request location is required",
       });
     }
 
-    const donors = await findNearbyDonors(bloodGroup, coordinates, radiusKm);
+    const donors = (await findNearbyDonors(bloodGroup, coordinates, requestedRadius, [req.user._id])).filter(
+      (donor) => donor?._id && donor.location?.coordinates?.length >= 2,
+    );
 
     const request = await BloodRequest.create({
       requestedBy: req.user._id,
       bloodGroup,
-      unitsNeeded,
+      unitsNeeded: requestedUnits,
       urgency,
       notes,
       location: { type: "Point", coordinates },
-      radiusKm,
+      radiusKm: requestedRadius,
       notifiedDonors: donors.map((donor) => donor._id),
     });
 
@@ -93,22 +115,31 @@ exports.createRequest = async (req, res) => {
       coordinates,
       donors.map((donor) => donor.location.coordinates),
     );
+    const rankedDonors = rankDonorsByShortestPath(coordinates, donors, distances);
 
-    await Notification.insertMany(
-      donors.map((donor, index) => ({
+    const notifications = await Notification.insertMany(
+      rankedDonors.map(({ donor, routing }, index) => ({
         recipient: donor._id,
         type: "blood_request",
-        title: `${bloodGroup} blood needed`,
-        message: `${req.user.firstName} needs ${unitsNeeded} unit(s). Distance: ${distances[index].distance}`,
+        title: `${urgency === "critical" ? "SOS: " : ""}${bloodGroup} blood needed`,
+        message: `${req.user.firstName} needs ${requestedUnits} unit(s). Distance: ${routing.distance}`,
         data: {
           requestId: request._id,
           urgency,
           bloodGroup,
-          distance: distances[index].distance,
-          duration: distances[index].duration,
+          compatibleBloodGroups: compatibleDonorGroupsFor(bloodGroup),
+          distance: routing.distance,
+          duration: routing.duration,
+          distanceKm: routing.distanceKm,
+          rank: index + 1,
+          routingAlgorithm: routing.algorithm,
         },
       })),
     );
+
+    notifications.forEach((notification) => {
+      if (notification?.recipient) emitToUser(notification.recipient, "blood-request:new", notification);
+    });
 
     for (const donor of donors) {
       if (donor.email && (process.env.EMAIL_USER || process.env.SMTP_USER)) {
@@ -130,6 +161,8 @@ exports.createRequest = async (req, res) => {
       data: {
         request,
         notifiedDonors: donors.length,
+        eligibleBloodGroups: compatibleDonorGroupsFor(bloodGroup),
+        matchingAlgorithm: rankedDonors[0]?.routing.algorithm || "none",
       },
       message: "Blood request created",
     });
@@ -143,7 +176,9 @@ exports.createRequest = async (req, res) => {
 
 exports.getRequests = async (req, res) => {
   try {
-    const filter = req.user.role === "hospital" ? { requestedBy: req.user._id } : {};
+    const filter = ["hospital", "donor"].includes(req.user.role)
+      ? { requestedBy: req.user._id }
+      : {};
     const requests = await BloodRequest.find(filter)
       .populate("requestedBy", "firstName lastName city location")
       .populate("respondingDonors.donor", "firstName lastName phoneNumber bloodGroup")
@@ -181,6 +216,31 @@ exports.respondToRequest = async (req, res) => {
       });
     }
 
+    if (action === "accept") {
+      const claimedRequest = await BloodRequest.findOneAndUpdate(
+        {
+          _id: request._id,
+          $or: [
+            { acceptedDonor: { $exists: false } },
+            { acceptedDonor: null },
+            { acceptedDonor: req.user._id },
+          ],
+        },
+        { status: "responding", acceptedDonor: req.user._id },
+        { new: true },
+      );
+
+      if (!claimedRequest) {
+        return res.status(409).json({
+          success: false,
+          message: "Another donor has already accepted this request",
+        });
+      }
+
+      request.status = "responding";
+      request.acceptedDonor = req.user._id;
+    }
+
     request.respondingDonors = request.respondingDonors.filter(
       (entry) => String(entry.donor) !== String(req.user._id),
     );
@@ -189,13 +249,25 @@ exports.respondToRequest = async (req, res) => {
       action,
       respondedAt: new Date(),
     });
-    if (action === "accept") {
-      request.status = "responding";
-    }
 
     await request.save();
 
-    await Notification.create({
+    await Notification.findOneAndUpdate(
+      {
+        recipient: req.user._id,
+        type: "blood_request",
+        "data.requestId": request._id,
+      },
+      {
+        $set: {
+          isRead: true,
+          "data.response": action,
+          "data.respondedAt": new Date(),
+        },
+      },
+    );
+
+    const responseNotification = await Notification.create({
       recipient: request.requestedBy,
       type: "donor_response",
       title: `Donor ${action}ed request`,
@@ -206,9 +278,76 @@ exports.respondToRequest = async (req, res) => {
       },
     });
 
+    emitToUser(request.requestedBy, "blood-request:response", responseNotification);
+
+    let conversation = null;
+    if (action === "accept") {
+      conversation = await ChatConversation.findOneAndUpdate(
+        { request: request._id },
+        {
+          request: request._id,
+          hospital: request.requestedBy,
+          donor: req.user._id,
+          $setOnInsert: {
+            messages: [
+              {
+                sender: req.user._id,
+                message: "I can help with this blood request.",
+                readBy: [req.user._id],
+              },
+            ],
+          },
+        },
+        { new: true, upsert: true },
+      );
+
+      const otherDonors = request.notifiedDonors.filter(
+        (donorId) => String(donorId) !== String(req.user._id),
+      );
+
+      if (otherDonors.length) {
+        await Notification.updateMany(
+          {
+            recipient: { $in: otherDonors },
+            type: "blood_request",
+            "data.requestId": request._id,
+          },
+          {
+            $set: {
+              isRead: true,
+              title: `${request.bloodGroup} request covered`,
+              message: `${req.user.firstName} accepted this request. Thanks for being ready to help.`,
+              "data.closed": true,
+              "data.acceptedDonorId": req.user._id,
+              "data.acceptedDonorName": `${req.user.firstName || ""} ${req.user.lastName || ""}`.trim(),
+              "data.closedAt": new Date(),
+            },
+          },
+        );
+
+        otherDonors.forEach((donorId) => {
+          emitToUser(donorId, "blood-request:closed", {
+            requestId: request._id,
+            acceptedDonorId: req.user._id,
+            acceptedDonorName: `${req.user.firstName || ""} ${req.user.lastName || ""}`.trim(),
+            message: `${req.user.firstName} accepted this request.`,
+          });
+        });
+      }
+
+      emitToUser(req.user._id, "chat:ready", {
+        requestId: request._id,
+        conversationId: conversation._id,
+      });
+      emitToUser(request.requestedBy, "chat:ready", {
+        requestId: request._id,
+        conversationId: conversation._id,
+      });
+    }
+
     return res.status(200).json({
       success: true,
-      data: request,
+      data: { request, conversation },
       message: "Response saved",
     });
   } catch (err) {
@@ -257,6 +396,59 @@ exports.updateRequestStatus = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: err.message || "Error updating request status",
+    });
+  }
+};
+
+exports.completeDonationForRequest = async (req, res) => {
+  try {
+    const request = await BloodRequest.findOne({
+      _id: req.params.id,
+      requestedBy: req.user._id,
+      acceptedDonor: { $exists: true, $ne: null },
+    });
+
+    if (!request) {
+      return res.status(404).json({
+        success: false,
+        message: "Accepted blood request not found",
+      });
+    }
+
+    request.status = "fulfilled";
+    request.fulfilledAt = new Date();
+    await request.save();
+
+    const deferralUntil = await deferDonorAfterDonation(
+      request.acceptedDonor,
+      "SOS donation completed. Donor is deferred for 30 days.",
+    );
+
+    await Notification.create({
+      recipient: request.acceptedDonor,
+      type: "eligibility_deferred",
+      title: "Donation completed",
+      message: "Thank you for donating. You are not eligible for the next 30 days.",
+      data: {
+        requestId: request._id,
+        deferralUntil,
+      },
+    });
+
+    emitToUser(request.acceptedDonor, "eligibility:deferred", {
+      requestId: request._id,
+      deferralUntil,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: { request, deferralUntil },
+      message: "Donation completed and donor deferred for 30 days",
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: err.message || "Error completing request donation",
     });
   }
 };

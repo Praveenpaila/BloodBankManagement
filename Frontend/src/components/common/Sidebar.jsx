@@ -1,36 +1,37 @@
 import { NavLink } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/authStore';
 
-export const sidebarItems = {
+const sidebarItems = {
   donor: [
-    ['Dashboard', '🏠', '/donor/dashboard'],
-    ['My Profile', '👤', '/donor/profile'],
-    ['Eligibility Check', '✅', '/donor/eligibility'],
-    ['Book Appointment', '📅', '/donor/appointments'],
-    ['Donation History', '🧾', '/donor/history'],
-    ['Badges & Points', '🏅', '/donor/badges'],
-    ['Notifications', '🔔', '/donor/notifications'],
-    ['Nearby Requests', '📍', '/donor/nearby-requests'],
+    ['Dashboard', 'Home', '/donor/dashboard'],
+    ['My Profile', 'User', '/donor/profile'],
+    ['Eligibility Check', 'Check', '/donor/eligibility'],
+    ['Book Appointment', 'Date', '/donor/appointments'],
+    ['Donation History', 'Log', '/donor/history'],
+    ['Badges & Points', 'Award', '/donor/badges'],
+    ['Notifications', 'Bell', '/donor/notifications'],
+    ['Nearby Requests', 'Map', '/donor/nearby-requests'],
+    ['Emergency SOS', 'SOS', '/donor/sos'],
   ],
   hospital: [
-    ['Dashboard', '🏠', '/hospital/dashboard'],
-    ['Blood Inventory', '🧪', '/hospital/inventory'],
-    ['Raise Request', '🚨', '/hospital/raise-request'],
-    ['Request Status', '📋', '/hospital/requests'],
-    ['Donor Search', '🔎', '/hospital/donor-search'],
-    ['Expiry Alerts', '⏰', '/hospital/expiry-alerts'],
-    ['Profile', '🏥', '/hospital/profile'],
-    ['Notifications', '🔔', '/hospital/notifications'],
+    ['Dashboard', 'Home', '/hospital/dashboard'],
+    ['Blood Inventory', 'Stock', '/hospital/inventory'],
+    ['Raise Request', 'SOS', '/hospital/raise-request'],
+    ['Request Status', 'List', '/hospital/requests'],
+    ['Donor Search', 'Find', '/hospital/donor-search'],
+    ['Expiry Alerts', 'Clock', '/hospital/expiry-alerts'],
+    ['Profile', 'Care', '/hospital/profile'],
+    ['Notifications', 'Bell', '/hospital/notifications'],
   ],
   admin: [
-    ['Dashboard', '🏠', '/admin/dashboard'],
-    ['Users', '👥', '/admin/users'],
-    ['Inventory', '🧪', '/admin/inventory'],
-    ['Requests', '📋', '/admin/requests'],
-    ['Analytics', '📊', '/admin/analytics'],
-    ['Broadcast', '📣', '/admin/broadcast'],
-    ['Settings', '⚙️', '/admin/settings'],
-    ['Reports', '📄', '/admin/reports'],
+    ['Dashboard', 'Home', '/admin/dashboard'],
+    ['Users', 'Users', '/admin/users'],
+    ['Inventory', 'Stock', '/admin/inventory'],
+    ['Requests', 'List', '/admin/requests'],
+    ['Analytics', 'Chart', '/admin/analytics'],
+    ['Broadcast', 'Cast', '/admin/broadcast'],
+    ['Settings', 'Gear', '/admin/settings'],
+    ['Reports', 'Docs', '/admin/reports'],
   ],
 };
 
@@ -51,7 +52,7 @@ const Sidebar = ({ role }) => {
               }`
             }
           >
-            <span>{icon}</span>
+            <span className="min-w-9 text-xs font-black uppercase tracking-wide">{icon}</span>
             <span>{label}</span>
           </NavLink>
         ))}

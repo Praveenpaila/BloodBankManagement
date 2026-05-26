@@ -1,7 +1,8 @@
 import { Bell, Menu, UserCircle } from 'lucide-react';
 import { Link, NavLink } from 'react-router-dom';
 import { useEffect, useState } from 'react';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/authStore';
+import { useSocket } from '../../context/SocketContext';
 import api from '../../api/axios';
 
 const publicLinks = [
@@ -12,13 +13,14 @@ const publicLinks = [
 ];
 
 const roleLinks = {
-  donor: [['Dashboard', '/donor/dashboard'], ['Requests', '/donor/nearby-requests']],
+  donor: [['Dashboard', '/donor/dashboard'], ['Requests', '/donor/nearby-requests'], ['SOS', '/donor/sos']],
   hospital: [['Dashboard', '/hospital/dashboard'], ['Inventory', '/hospital/inventory']],
   admin: [['Dashboard', '/admin/dashboard'], ['Users', '/admin/users']],
 };
 
 const Navbar = () => {
   const { user, isAuthenticated, logout } = useAuth();
+  const { socket } = useSocket();
   const [open, setOpen] = useState(false);
   const [unread, setUnread] = useState(0);
 
@@ -38,6 +40,27 @@ const Navbar = () => {
     const interval = setInterval(load, 30000);
     return () => clearInterval(interval);
   }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (!socket) return undefined;
+    const bump = () => setUnread((value) => value + 1);
+    const refresh = async () => {
+      try {
+        const { data } = await api.get('/notifications');
+        setUnread(data.data.filter((item) => !item.isRead).length);
+      } catch {
+        setUnread(0);
+      }
+    };
+    socket.on('blood-request:new', bump);
+    socket.on('blood-request:response', bump);
+    socket.on('blood-request:closed', refresh);
+    return () => {
+      socket.off('blood-request:new', bump);
+      socket.off('blood-request:response', bump);
+      socket.off('blood-request:closed', refresh);
+    };
+  }, [socket]);
 
   const links = isAuthenticated ? roleLinks[user?.role] || [] : publicLinks;
 

@@ -1,4 +1,5 @@
 const UserModel = require("../models/user");
+const { bloodGroupFilterFor, compatibleDonorGroupsFor } = require("../utils/bloodCompatibility");
 
 exports.updateLocation = async (req, res) => {
   try {
@@ -44,8 +45,20 @@ exports.searchDonors = async (req, res) => {
       isEligible: true,
     };
 
+    if (req.user?._id) {
+      filter._id = { $ne: req.user._id };
+    }
+
     if (bloodGroup) {
-      filter.bloodGroup = bloodGroup;
+      const compatibleBloodGroups = compatibleDonorGroupsFor(bloodGroup);
+      if (compatibleBloodGroups.length === 0) {
+        return res.status(200).json({
+          success: true,
+          count: 0,
+          data: [],
+        });
+      }
+      filter.bloodGroup = bloodGroupFilterFor(bloodGroup);
     }
 
     if (city) {
@@ -84,14 +97,26 @@ exports.searchDonors = async (req, res) => {
 exports.countDonors = async (req, res) => {
   try {
     const { bloodGroup, lat, lng, radius = 10 } = req.query;
+    const radiusKm = Math.max(Number(radius) || 10, 1);
     const filter = {
       role: "donor",
       isActive: true,
       isEligible: true,
     };
 
+    if (req.user?._id) {
+      filter._id = { $ne: req.user._id };
+    }
+
     if (bloodGroup) {
-      filter.bloodGroup = bloodGroup;
+      const compatibleBloodGroups = compatibleDonorGroupsFor(bloodGroup);
+      if (compatibleBloodGroups.length === 0) {
+        return res.status(200).json({
+          success: true,
+          data: { count: 0 },
+        });
+      }
+      filter.bloodGroup = bloodGroupFilterFor(bloodGroup);
     }
 
     if (lat && lng) {
@@ -101,16 +126,16 @@ exports.countDonors = async (req, res) => {
             type: "Point",
             coordinates: [Number(lng), Number(lat)],
           },
-          $maxDistance: Number(radius) * 1000,
+          $maxDistance: radiusKm * 1000,
         },
       };
     }
 
-    const count = await UserModel.countDocuments(filter);
+    const donors = await UserModel.find(filter).select("_id").lean();
 
     return res.status(200).json({
       success: true,
-      data: { count },
+      data: { count: donors.length },
     });
   } catch (err) {
     return res.status(500).json({

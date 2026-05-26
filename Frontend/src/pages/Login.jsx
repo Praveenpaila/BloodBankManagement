@@ -1,7 +1,7 @@
-import React, { useState, useContext } from 'react';
+import { useState, useContext } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Droplet, ArrowRight, Mail, Phone, Lock } from 'lucide-react';
-import { AuthContext } from '../context/AuthContext';
+import { AuthContext } from '../context/authStore';
 
 export default function Login() {
   const [usePhone, setUsePhone] = useState(false);

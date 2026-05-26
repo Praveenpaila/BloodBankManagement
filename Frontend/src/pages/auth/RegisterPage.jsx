@@ -1,10 +1,10 @@
 import { yupResolver } from '@hookform/resolvers/yup';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import * as yup from 'yup';
 import api from '../../api/axios';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/authStore';
 import { BLOOD_GROUPS } from '../../utils/bloodGroups';
 
 const schema = yup.object({
@@ -22,15 +22,16 @@ const RegisterPage = () => {
   const defaultRole = params.get('role') || 'donor';
   const navigate = useNavigate();
   const { register: createAccount, dashboardFor } = useAuth();
-  const { register, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } = useForm({
+  const { register, handleSubmit, control, getValues, setValue, formState: { errors, isSubmitting } } = useForm({
     resolver: yupResolver(schema),
     defaultValues: { role: defaultRole, bloodGroup: 'O+', gender: 'male', otp: '' },
   });
-  const role = watch('role');
+  const role = useWatch({ control, name: 'role' });
 
   const sendOtp = async () => {
     try {
-      await api.post('/auth/send-otp', { email: watch('email'), phoneNumber: watch('phoneNumber') });
+      const { email, phoneNumber } = getValues();
+      await api.post('/auth/send-otp', { email, phoneNumber });
       toast.success('OTP sent');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to send OTP');

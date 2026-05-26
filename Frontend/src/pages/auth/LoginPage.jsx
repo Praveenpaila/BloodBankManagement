@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import * as yup from 'yup';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/authStore';
 
 const schema = yup.object({
   email: yup.string().email('Enter a valid email').required('Email is required'),

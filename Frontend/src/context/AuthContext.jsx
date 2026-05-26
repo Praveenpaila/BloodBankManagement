@@ -1,15 +1,8 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api from '../api/axios';
-
-export const AuthContext = createContext(null);
-
-const dashboardFor = (role) => {
-  if (role === 'admin') return '/admin/dashboard';
-  if (role === 'hospital') return '/hospital/dashboard';
-  return '/donor/dashboard';
-};
+import { AuthContext, dashboardFor } from './authStore';
 
 export const AuthProvider = ({ children }) => {
   const navigate = useNavigate();
@@ -39,34 +32,34 @@ export const AuthProvider = ({ children }) => {
     loadUser();
   }, [token]);
 
-  const login = async (email, password) => {
+  const login = useCallback(async (email, password) => {
     const { data } = await api.post('/auth/login', { email, password });
     localStorage.setItem('token', data.token);
     setToken(data.token);
     setUser(data.user);
     toast.success('Logged in successfully');
     return data.user.role;
-  };
+  }, []);
 
-  const register = async (payload) => {
+  const register = useCallback(async (payload) => {
     const { data } = await api.post('/auth/signup', payload);
     localStorage.setItem('token', data.token);
     setToken(data.token);
     setUser(data.user);
     toast.success('Account created');
     return data.user.role;
-  };
+  }, []);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     localStorage.removeItem('token');
     setToken('');
     setUser(null);
     navigate('/login');
-  };
+  }, [navigate]);
 
-  const updateUser = (updates) => {
+  const updateUser = useCallback((updates) => {
     setUser((current) => ({ ...current, ...updates }));
-  };
+  }, []);
 
   const value = useMemo(
     () => ({
@@ -80,10 +73,8 @@ export const AuthProvider = ({ children }) => {
       updateUser,
       dashboardFor,
     }),
-    [user, token, loading],
+    [user, token, loading, login, logout, register, updateUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
-
-export const useAuth = () => useContext(AuthContext);

@@ -2,6 +2,7 @@ const DonationHistory = require("../models/DonationHistory");
 const UserModel = require("../models/user");
 const BloodRequest = require("../models/BloodRequest");
 const { awardPoints } = require("./loyaltyController");
+const { deferDonorAfterDonation } = require("../utils/eligibilityDeferral");
 
 const generateCertificateId = () => {
   return `BL-${Date.now()}${Math.floor(Math.random() * 9000 + 1000)}`;
@@ -30,6 +31,10 @@ exports.recordDonation = async (req, res) => {
     await UserModel.findByIdAndUpdate(donorId, {
       $inc: { totalDonations: 1 },
     });
+    const deferralUntil = await deferDonorAfterDonation(
+      donorId,
+      "Donation completed. Donor is deferred for 30 days.",
+    );
     await awardPoints(donorId, "donation", 100, "Donation completed");
 
     if (requestId) {
@@ -47,6 +52,7 @@ exports.recordDonation = async (req, res) => {
     return res.status(201).json({
       success: true,
       data: donation,
+      deferralUntil,
       message: "Donation recorded",
     });
   } catch (err) {

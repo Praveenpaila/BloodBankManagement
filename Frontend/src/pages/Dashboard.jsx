@@ -1,7 +1,7 @@
-import React, { useContext } from 'react';
+import { useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LogOut, Droplet, Heart, Activity, User } from 'lucide-react';
-import { AuthContext } from '../context/AuthContext';
+import { AuthContext } from '../context/authStore';
 
 export default function Dashboard() {
   const { logout } = useContext(AuthContext);

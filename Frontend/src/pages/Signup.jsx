@@ -1,7 +1,7 @@
-import React, { useState, useContext } from 'react';
+import { useState, useContext } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Droplet, ArrowRight, ArrowLeft, ShieldCheck } from 'lucide-react';
-import { AuthContext } from '../context/AuthContext';
+import { AuthContext } from '../context/authStore';
 
 export default function Signup() {
   const [step, setStep] = useState(1);
