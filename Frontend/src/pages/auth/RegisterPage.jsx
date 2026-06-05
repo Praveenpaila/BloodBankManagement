@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { yupResolver } from '@hookform/resolvers/yup';
 import { useForm, useWatch } from 'react-hook-form';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
@@ -22,6 +23,7 @@ const RegisterPage = () => {
   const defaultRole = params.get('role') || 'donor';
   const navigate = useNavigate();
   const { register: createAccount, dashboardFor } = useAuth();
+  const [otpSending, setOtpSending] = useState(false);
   const { register, handleSubmit, control, getValues, setValue, formState: { errors, isSubmitting } } = useForm({
     resolver: yupResolver(schema),
     defaultValues: { role: defaultRole, bloodGroup: 'O+', gender: 'male', otp: '' },
@@ -30,11 +32,14 @@ const RegisterPage = () => {
 
   const sendOtp = async () => {
     try {
+      setOtpSending(true);
       const { email, phoneNumber } = getValues();
       await api.post('/auth/send-otp', { email, phoneNumber });
       toast.success('OTP sent');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to send OTP');
+    } finally {
+      setOtpSending(false);
     }
   };
 
@@ -89,9 +94,24 @@ const RegisterPage = () => {
           {role === 'hospital' && <input className="input-field" placeholder="Registration number" {...register('registrationNumber')} />}
           <div><input className="input-field" type="password" placeholder="Password" {...register('password')} />{errors.password && <p className="text-sm text-red-600">{errors.password.message}</p>}</div>
           <div><input className="input-field" type="password" placeholder="Confirm password" {...register('confirmPassword')} />{errors.confirmPassword && <p className="text-sm text-red-600">{errors.confirmPassword.message}</p>}</div>
-          <div className="flex gap-2">
-            <input className="input-field" placeholder="OTP" {...register('otp')} />
-            <button className="btn-outline" type="button" onClick={sendOtp}>Send OTP</button>
+          <div className="otp-field">
+            <div className="flex gap-2">
+              <input className="input-field" placeholder="OTP" disabled={otpSending} {...register('otp')} />
+              <button className="btn-outline min-w-32" type="button" onClick={sendOtp} disabled={otpSending}>
+                {otpSending ? 'Sending...' : 'Send OTP'}
+              </button>
+            </div>
+            {otpSending && (
+              <div className="otp-sending" role="status" aria-live="polite">
+                <span className="otp-sending__ring" />
+                <div>
+                  <p>Sending OTP</p>
+                  <span>Please wait while we deliver your code.</span>
+                </div>
+                <span className="otp-sending__dots"><i /><i /><i /></span>
+              </div>
+            )}
+            {errors.otp && <p className="text-sm text-red-600">{errors.otp.message}</p>}
           </div>
         </div>
         <button className="btn-primary mt-5 w-full" disabled={isSubmitting}>{isSubmitting ? 'Creating...' : 'Register'}</button>

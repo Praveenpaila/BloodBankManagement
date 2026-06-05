@@ -101,6 +101,19 @@ const exportCsv = (filename, rows) => {
   URL.revokeObjectURL(url);
 };
 
+const getLiveBrowserLocation = () => new Promise((resolve, reject) => {
+  if (!navigator.geolocation) {
+    reject(new Error('Location is not available in this browser'));
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    ({ coords }) => resolve({ lat: coords.latitude, lng: coords.longitude }),
+    (error) => reject(new Error(error.code === error.PERMISSION_DENIED ? 'Location permission was denied' : 'Could not read live location')),
+    { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 },
+  );
+});
+
 export const ForgotPasswordPage = () => {
   const [sent, setSent] = useState(false);
   return (
@@ -481,25 +494,14 @@ export const NearbyRequestsPage = () => {
   }, [coords?.join(',')]);
 
   const enable = () => {
-    if (!navigator.geolocation) {
-      toast.error('Location is not available in this browser');
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      async ({ coords: c }) => {
-        try {
-          const { data: response } = await api.put('/donors/location', { lat: c.latitude, lng: c.longitude });
-          updateUser(response.data);
-          reload();
-          toast.success('Location updated');
-        } catch (err) {
-          toast.error(err.response?.data?.message || 'Location update failed');
-        }
-      },
-      () => toast.error('Location permission was denied'),
-      { enableHighAccuracy: true, timeout: 10000 },
-    );
+    getLiveBrowserLocation()
+      .then(async (liveCoords) => {
+        const { data: response } = await api.put('/donors/location', liveCoords);
+        updateUser(response.data);
+        reload();
+        toast.success('Location updated');
+      })
+      .catch((err) => toast.error(err.response?.data?.message || err.message || 'Location update failed'));
   };
 
   return (
@@ -584,50 +586,38 @@ export const RaiseRequest = () => {
   }, [form.bloodGroup, form.radiusKm, coords?.join(',')]);
 
   const updateLocation = () => {
-    if (!navigator.geolocation) {
-      toast.error('Location is not available in this browser');
-      return;
-    }
-
     setRequestingLocation(true);
-    navigator.geolocation.getCurrentPosition(
-      async ({ coords: c }) => {
-        try {
-          const { data } = await api.put('/donors/location', { lat: c.latitude, lng: c.longitude });
-          updateUser(data.data);
-          toast.success('Location updated');
-        } catch (err) {
-          toast.error(err.response?.data?.message || 'Location update failed');
-        } finally {
-          setRequestingLocation(false);
-        }
-      },
-      () => {
-        toast.error('Location permission was denied');
-        setRequestingLocation(false);
-      },
-      { enableHighAccuracy: true, timeout: 10000 },
-    );
+    getLiveBrowserLocation()
+      .then(async (liveCoords) => {
+        const { data } = await api.put('/donors/location', liveCoords);
+        updateUser(data.data);
+        toast.success('Location updated');
+        reload();
+      })
+      .catch((err) => toast.error(err.response?.data?.message || err.message || 'Location update failed'))
+      .finally(() => setRequestingLocation(false));
   };
 
   const submit = async () => {
-    if (!hasLocation) {
-      toast.error('Update your location before raising SOS');
-      return;
-    }
-
+    setRequestingLocation(true);
     try {
+      const liveCoords = await getLiveBrowserLocation();
+      const { data: updatedUser } = await api.put('/donors/location', liveCoords);
+      updateUser(updatedUser.data);
+
       const { data } = await api.post('/blood-requests', {
         ...form,
         unitsNeeded: Number(form.unitsNeeded),
         radiusKm: Number(form.radiusKm),
-        lat: coords[1],
-        lng: coords[0],
+        lat: liveCoords.lat,
+        lng: liveCoords.lng,
       });
       toast.success(`SOS sent to ${data.data.notifiedDonors} donors by ${data.data.matchingAlgorithm}`);
       reload();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Request failed');
+      toast.error(err.response?.data?.message || err.message || 'Request failed');
+    } finally {
+      setRequestingLocation(false);
     }
   };
   const isDonorSos = user?.role === 'donor';
@@ -659,7 +649,7 @@ export const RaiseRequest = () => {
               <p className="text-sm font-bold text-slate-500">Matching eligible donors</p>
               <p className="text-3xl font-black text-red-700">{count || 0}</p>
             </div>
-            <button className="btn-primary" onClick={submit} disabled={!hasLocation}>{isDonorSos ? 'Raise Emergency SOS' : 'Request Blood'}</button>
+            <button className="btn-primary" onClick={submit} disabled={requestingLocation}>{requestingLocation ? 'Reading Location...' : isDonorSos ? 'Raise Emergency SOS' : 'Request Blood'}</button>
           </div>
         </div>
       </div>

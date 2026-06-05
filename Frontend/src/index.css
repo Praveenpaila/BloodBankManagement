@@ -119,6 +119,14 @@ textarea {
   box-shadow: 0 0 0 4px var(--ring);
 }
 
+.input-field:disabled,
+.btn-primary:disabled,
+.btn-outline:disabled {
+  cursor: not-allowed;
+  opacity: 0.68;
+  transform: none;
+}
+
 .input-field-lg {
   min-height: 3.25rem;
   font-weight: 800;
@@ -317,6 +325,66 @@ th {
   border-radius: 0.5rem;
   background: #f8fafc;
   padding: 1rem;
+}
+
+.otp-field {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.otp-sending {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  border: 1px solid rgba(192, 57, 43, 0.2);
+  border-radius: 0.5rem;
+  background: linear-gradient(90deg, #fff6f5 0%, #ffffff 100%);
+  padding: 0.75rem 0.85rem;
+  box-shadow: 0 10px 24px rgba(192, 57, 43, 0.08);
+  animation: otp-card-pulse 1.8s ease-in-out infinite;
+}
+
+.otp-sending__ring {
+  width: 1.35rem;
+  height: 1.35rem;
+  border: 3px solid #ffd7d3;
+  border-top-color: var(--primary);
+  border-radius: 999px;
+  animation: otp-spin 0.8s linear infinite;
+}
+
+.otp-sending p {
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 950;
+}
+
+.otp-sending span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.otp-sending__dots {
+  display: inline-flex;
+  gap: 0.25rem;
+}
+
+.otp-sending__dots i {
+  width: 0.36rem;
+  height: 0.36rem;
+  border-radius: 999px;
+  background: var(--primary);
+  animation: otp-dot 1s ease-in-out infinite;
+}
+
+.otp-sending__dots i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.otp-sending__dots i:nth-child(3) {
+  animation-delay: 0.3s;
 }
 
 .alert-toast {
@@ -543,6 +611,37 @@ th {
   }
 }
 
+@keyframes otp-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes otp-card-pulse {
+  0%,
+  100% {
+    border-color: rgba(192, 57, 43, 0.16);
+    box-shadow: 0 10px 24px rgba(192, 57, 43, 0.06);
+  }
+  50% {
+    border-color: rgba(192, 57, 43, 0.38);
+    box-shadow: 0 12px 28px rgba(192, 57, 43, 0.13);
+  }
+}
+
+@keyframes otp-dot {
+  0%,
+  80%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.45;
+  }
+  40% {
+    transform: translateY(-0.28rem);
+    opacity: 1;
+  }
+}
+
 @keyframes sos-beacon {
   70% {
     box-shadow: 0 0 0 1.3rem rgba(192, 57, 43, 0);
@@ -590,5 +689,13 @@ th {
   .sos-alarm__meta,
   .sos-alarm__actions {
     grid-template-columns: 1fr;
+  }
+
+  .otp-sending {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .otp-sending__dots {
+    grid-column: 2;
   }
 }
