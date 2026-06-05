@@ -11,7 +11,7 @@ const http = require("http");
 const { initRealtime } = require("./utils/realtime");
 
 const app = express();
-const port = process.env.PORT || 5000;
+const port = process.env.PORT || 3000;
 const server = http.createServer(app);
 initRealtime(server);
 
@@ -55,7 +55,9 @@ app.get("/api/health", (req, res) => {
 require("./utils/cronJobs");
 
 const mongoURI =
-  process.env.MONGO_URI || process.env.MONGO_URL || "mongodb://127.0.0.1:27017/bloodbank";
+  process.env.MONGO_URI ||
+  process.env.MONGO_URL ||
+  "mongodb://127.0.0.1:27017/bloodbank";
 
 mongoose
   .connect(mongoURI)

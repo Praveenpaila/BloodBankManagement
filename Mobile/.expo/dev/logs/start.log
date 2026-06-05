@@ -1,0 +1,33 @@
+{"_e":"root:init","_t":1780236555904,"format":"v0-jsonl","version":"56.1.13"}
+{"_e":"env:mode","_t":1780236555907,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1780236555916,"mode":"development","files":[],"env":{}}
+{"_e":"devserver:start","_t":1780236556374,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../..\\..\\app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":false}
+{"_e":"metro:config","_t":1780236557054,"serverRoot":"../..\\..","projectRoot":"../..\\..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"metro:server_log","_t":1780236558018,"level":"error","data":["An unexpected error occurred while installing the latest version of React Native DevTools. Using a fallback version instead. Details:\n\ndotslash error: 'fetch' command failed\ncaused by: failed to create directory `C:\\Users\\paila praveen\\AppData\\Local\\dotslash\\1f`\ncaused by: Access is denied. (os error 5)\n"]}
+{"_e":"metro:instantiate","_t":1780236566202,"atlas":false,"workers":10,"host":"::1","port":8081}
+{"_e":"root:init","_t":1780236587092,"format":"v0-jsonl","version":"56.1.13"}
+{"_e":"env:mode","_t":1780236587095,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1780236587099,"mode":"development","files":[],"env":{}}
+{"_e":"devserver:start","_t":1780236587527,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../..\\..\\app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":false}
+{"_e":"metro:config","_t":1780236588069,"serverRoot":"../..\\..","projectRoot":"../..\\..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"metro:server_log","_t":1780236588470,"level":"error","data":["An unexpected error occurred while installing the latest version of React Native DevTools. Using a fallback version instead. Details:\n\ndotslash error: 'fetch' command failed\ncaused by: failed to create directory `C:\\Users\\paila praveen\\AppData\\Local\\dotslash\\1f`\ncaused by: Access is denied. (os error 5)\n"]}
+{"_e":"metro:instantiate","_t":1780236595350,"atlas":false,"workers":10,"host":"::1","port":8081}
+{"_e":"root:init","_t":1780236664898,"format":"v0-jsonl","version":"56.1.13"}
+{"_e":"env:mode","_t":1780236664899,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1780236664903,"mode":"development","files":[],"env":{}}
+{"_e":"devserver:start","_t":1780236665275,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../..\\..\\app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":false}
+{"_e":"metro:config","_t":1780236665891,"serverRoot":"../..\\..","projectRoot":"../..\\..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"metro:instantiate","_t":1780236673859,"atlas":false,"workers":10,"host":"::1","port":8081}
+{"_e":"metro:server_log","_t":1780241667167,"level":"warn","data":["Failed to download the latest version of React Native DevTools. Using a fallback version instead. Connect to the internet or check your network settings."]}
+{"_e":"root:init","_t":1780244942919,"format":"v0-jsonl","version":"56.1.13"}
+{"_e":"env:mode","_t":1780244942920,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1780244942924,"mode":"development","files":[],"env":{}}
+{"_e":"devserver:start","_t":1780244943453,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../..\\..\\app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":false}
+{"_e":"metro:config","_t":1780244944147,"serverRoot":"../..\\..","projectRoot":"../..\\..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"metro:instantiate","_t":1780244951827,"atlas":false,"workers":10,"host":"::","port":8081}
+{"_e":"metro:client_log","_t":1780244988416,"level":"error","data":["Project is incompatible with this version of Expo Go\n\nThis project requires a newer version of Expo Go.\n\nHow to fix this error:\nDownload the latest version of Expo Go from the Play Store."]}
+{"_e":"metro:client_log","_t":1780244995843,"level":"error","data":["Project is incompatible with this version of Expo Go\n\nThis project requires a newer version of Expo Go.\n\nHow to fix this error:\nDownload the latest version of Expo Go from the Play Store."]}
+{"_e":"metro:client_log","_t":1780245049267,"level":"error","data":["Project is incompatible with this version of Expo Go\n\nThis project requires a newer version of Expo Go.\n\nHow to fix this error:\nDownload the latest version of Expo Go from the Play Store."]}
+{"_e":"metro:client_log","_t":1780245054788,"level":"error","data":["Project is incompatible with this version of Expo Go\n\nThis project requires a newer version of Expo Go.\n\nHow to fix this error:\nDownload the latest version of Expo Go from the Play Store."]}
+{"_e":"metro:client_log","_t":1780245139999,"level":"error","data":["Project is incompatible with this version of Expo Go\n\nThis project requires a newer version of Expo Go.\n\nHow to fix this error:\nDownload the latest version of Expo Go from the Play Store."]}
+{"_e":"metro:client_log","_t":1780245145889,"level":"error","data":["Project is incompatible with this version of Expo Go\n\nThis project requires a newer version of Expo Go.\n\nHow to fix this error:\nDownload the latest version of Expo Go from the Play Store."]}

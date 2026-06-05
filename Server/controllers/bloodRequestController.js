@@ -9,6 +9,24 @@ const { deferDonorAfterDonation } = require("../utils/eligibilityDeferral");
 const { rankDonorsByShortestPath } = require("../utils/geoRouting");
 const { bloodGroupFilterFor, compatibleDonorGroupsFor } = require("../utils/bloodCompatibility");
 
+const parseCoordinates = (lat, lng) => {
+  const parsedLat = Number(lat);
+  const parsedLng = Number(lng);
+
+  if (
+    !Number.isFinite(parsedLat) ||
+    !Number.isFinite(parsedLng) ||
+    parsedLat < -90 ||
+    parsedLat > 90 ||
+    parsedLng < -180 ||
+    parsedLng > 180
+  ) {
+    return null;
+  }
+
+  return [parsedLng, parsedLat];
+};
+
 const getDistanceInfo = async (origin, destinations) => {
   if (!process.env.GOOGLE_MAPS_API_KEY || destinations.length === 0) {
     return destinations.map(() => ({ distance: "N/A", duration: "N/A" }));
@@ -79,20 +97,12 @@ exports.createRequest = async (req, res) => {
       });
     }
 
-    const coordinates =
-      lng !== undefined && lat !== undefined
-        ? [Number(lng), Number(lat)]
-        : req.user.location?.coordinates;
+    const coordinates = parseCoordinates(lat, lng);
 
-    if (
-      !coordinates?.length ||
-      coordinates.length < 2 ||
-      !Number.isFinite(coordinates[0]) ||
-      !Number.isFinite(coordinates[1])
-    ) {
+    if (!coordinates) {
       return res.status(400).json({
         success: false,
-        message: "Request location is required",
+        message: "Live request location is required",
       });
     }
 
@@ -457,8 +467,9 @@ exports.getNearbyRequests = async (req, res) => {
   try {
     const lat = Number(req.query.lat);
     const lng = Number(req.query.lng);
+    const coordinates = parseCoordinates(lat, lng);
 
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    if (!coordinates) {
       return res.status(400).json({
         success: false,
         message: "Provide valid lat and lng",
@@ -471,7 +482,7 @@ exports.getNearbyRequests = async (req, res) => {
         $near: {
           $geometry: {
             type: "Point",
-            coordinates: [lng, lat],
+            coordinates,
           },
           $maxDistance: 50000,
         },

@@ -1,11 +1,30 @@
 const UserModel = require("../models/user");
 const { bloodGroupFilterFor, compatibleDonorGroupsFor } = require("../utils/bloodCompatibility");
 
+const parseCoordinates = (lat, lng) => {
+  const parsedLat = Number(lat);
+  const parsedLng = Number(lng);
+
+  if (
+    !Number.isFinite(parsedLat) ||
+    !Number.isFinite(parsedLng) ||
+    parsedLat < -90 ||
+    parsedLat > 90 ||
+    parsedLng < -180 ||
+    parsedLng > 180
+  ) {
+    return null;
+  }
+
+  return [parsedLng, parsedLat];
+};
+
 exports.updateLocation = async (req, res) => {
   try {
     const { lat, lng } = req.body;
+    const coordinates = parseCoordinates(lat, lng);
 
-    if (!Number.isFinite(Number(lat)) || !Number.isFinite(Number(lng))) {
+    if (!coordinates) {
       return res.status(400).json({
         success: false,
         message: "Provide valid lat and lng",
@@ -17,7 +36,7 @@ exports.updateLocation = async (req, res) => {
       {
         location: {
           type: "Point",
-          coordinates: [Number(lng), Number(lat)],
+          coordinates,
         },
       },
       { new: true },
@@ -97,7 +116,16 @@ exports.searchDonors = async (req, res) => {
 exports.countDonors = async (req, res) => {
   try {
     const { bloodGroup, lat, lng, radius = 10 } = req.query;
+    const coordinates = parseCoordinates(lat, lng);
     const radiusKm = Math.max(Number(radius) || 10, 1);
+
+    if (!coordinates) {
+      return res.status(400).json({
+        success: false,
+        message: "Live location is required to count nearby donors",
+      });
+    }
+
     const filter = {
       role: "donor",
       isActive: true,
@@ -119,17 +147,15 @@ exports.countDonors = async (req, res) => {
       filter.bloodGroup = bloodGroupFilterFor(bloodGroup);
     }
 
-    if (lat && lng) {
-      filter.location = {
-        $near: {
-          $geometry: {
-            type: "Point",
-            coordinates: [Number(lng), Number(lat)],
-          },
-          $maxDistance: radiusKm * 1000,
+    filter.location = {
+      $near: {
+        $geometry: {
+          type: "Point",
+          coordinates,
         },
-      };
-    }
+        $maxDistance: radiusKm * 1000,
+      },
+    };
 
     const donors = await UserModel.find(filter).select("_id").lean();
 
