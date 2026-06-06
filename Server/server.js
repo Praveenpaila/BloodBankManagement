@@ -11,6 +11,7 @@ const http = require("http");
 const { initRealtime } = require("./utils/realtime");
 
 const app = express();
+app.set("trust proxy", 1);
 const port = process.env.PORT || 5000;
 const server = http.createServer(app);
 initRealtime(server);
