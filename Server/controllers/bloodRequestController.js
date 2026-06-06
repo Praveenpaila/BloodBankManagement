@@ -5,7 +5,7 @@ const Notification = require("../models/Notification");
 const ChatConversation = require("../models/ChatConversation");
 const { transporter } = require("./auth");
 const { emitToUser } = require("../utils/realtime");
-const { deferDonorAfterDonation } = require("../utils/eligibilityDeferral");
+const { recordCompletedDonation } = require("../utils/recordDonation");
 const { rankDonorsByShortestPath } = require("../utils/geoRouting");
 const { bloodGroupFilterFor, compatibleDonorGroupsFor } = require("../utils/bloodCompatibility");
 
@@ -207,7 +207,7 @@ exports.respondToRequest = async (req, res) => {
       });
     }
 
-    const request = await BloodRequest.findById(req.params.id || req.params.requestId);
+    let request = await BloodRequest.findById(req.params.id || req.params.requestId);
 
     if (!request) {
       return res.status(404).json({
@@ -220,11 +220,8 @@ exports.respondToRequest = async (req, res) => {
       const claimedRequest = await BloodRequest.findOneAndUpdate(
         {
           _id: request._id,
-          $or: [
-            { acceptedDonor: { $exists: false } },
-            { acceptedDonor: null },
-            { acceptedDonor: req.user._id },
-          ],
+          status: "open",
+          acceptedDonor: null,
         },
         { status: "responding", acceptedDonor: req.user._id },
         { new: true },
@@ -233,12 +230,11 @@ exports.respondToRequest = async (req, res) => {
       if (!claimedRequest) {
         return res.status(409).json({
           success: false,
-          message: "Another donor has already accepted this request",
+          message: "This request has already been accepted by another donor.",
         });
       }
 
-      request.status = "responding";
-      request.acceptedDonor = req.user._id;
+      request = claimedRequest;
     }
 
     request.respondingDonors = request.respondingDonors.filter(
@@ -286,7 +282,7 @@ exports.respondToRequest = async (req, res) => {
         { request: request._id },
         {
           request: request._id,
-          hospital: request.requestedBy,
+          requester: request.requestedBy,
           donor: req.user._id,
           $setOnInsert: {
             messages: [
@@ -369,9 +365,14 @@ exports.updateRequestStatus = async (req, res) => {
       });
     }
 
-    const update = { status };
+    const update = { $set: { status } };
     if (status === "fulfilled") {
-      update.fulfilledAt = new Date();
+      update.$set.fulfilledAt = new Date();
+    }
+    if (status === "open") {
+      update.$set.acceptedDonor = null;
+      update.$unset = { fulfilledAt: "" };
+      update.$pull = { respondingDonors: { action: "accept" } };
     }
 
     const request = await BloodRequest.findOneAndUpdate(
@@ -384,6 +385,45 @@ exports.updateRequestStatus = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: "Blood request not found",
+      });
+    }
+
+    if (status === "open") {
+      await ChatConversation.deleteOne({ request: request._id });
+
+      await Notification.updateMany(
+        {
+          recipient: { $in: request.notifiedDonors || [] },
+          type: "blood_request",
+          "data.requestId": request._id,
+        },
+        {
+          $set: {
+            isRead: false,
+            title: `${request.bloodGroup} blood needed`,
+            message: "This blood request is open again. Please respond if you can help.",
+            "data.closed": false,
+            "data.acceptedDonorId": null,
+            "data.reopenedAt": new Date(),
+          },
+          $unset: {
+            "data.closedAt": "",
+            "data.acceptedDonorName": "",
+          },
+        },
+      );
+
+      (request.notifiedDonors || []).forEach((donorId) => {
+        emitToUser(donorId, "blood-request:new", {
+          title: `${request.bloodGroup} blood needed`,
+          message: "This blood request is open again. Please respond if you can help.",
+          data: {
+            requestId: request._id,
+            urgency: request.urgency,
+            bloodGroup: request.bloodGroup,
+            reopened: true,
+          },
+        });
       });
     }
 
@@ -415,35 +455,51 @@ exports.completeDonationForRequest = async (req, res) => {
       });
     }
 
+    if (request.status === "fulfilled") {
+      return res.status(400).json({
+        success: false,
+        message: "Donation already recorded for this request",
+      });
+    }
+
+    const donationResult = await recordCompletedDonation({
+      donorId: request.acceptedDonor,
+      recordedBy: request.requestedBy,
+      bloodGroup: request.bloodGroup,
+      units: request.unitsNeeded,
+      notes: request.notes || "SOS donation completed via BloodLink",
+      bloodRequestId: request._id,
+      urgency: request.urgency,
+      source: "sos",
+    });
+
     request.status = "fulfilled";
     request.fulfilledAt = new Date();
     await request.save();
 
-    const deferralUntil = await deferDonorAfterDonation(
-      request.acceptedDonor,
-      "SOS donation completed. Donor is deferred for 30 days.",
-    );
+    const { donation, deferralUntil, loyalty } = donationResult;
 
     await Notification.create({
       recipient: request.acceptedDonor,
       type: "eligibility_deferred",
       title: "Donation completed",
-      message: "Thank you for donating. You are not eligible for the next 30 days.",
+      message: `Thank you for donating. +${loyalty.pointsAwarded} points earned. You are not eligible for the next 30 days.`,
       data: {
         requestId: request._id,
         deferralUntil,
+        donationId: donation._id,
+        pointsAwarded: loyalty.pointsAwarded,
+        badges: loyalty.badges,
+        certificateId: loyalty.certificateId,
       },
-    });
-
-    emitToUser(request.acceptedDonor, "eligibility:deferred", {
-      requestId: request._id,
-      deferralUntil,
     });
 
     return res.status(200).json({
       success: true,
-      data: { request, deferralUntil },
-      message: "Donation completed and donor deferred for 30 days",
+      data: { request, donation, deferralUntil, loyalty },
+      message: donationResult.duplicate
+        ? "Donation was already recorded for this request"
+        : `Donation recorded. +${loyalty.pointsAwarded} points earned.`,
     });
   } catch (err) {
     return res.status(500).json({

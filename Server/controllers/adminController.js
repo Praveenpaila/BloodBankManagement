@@ -140,7 +140,10 @@ exports.approveUser = async (req, res) => {
 
 exports.suspendUser = async (req, res) => {
   try {
-    await UserModel.findByIdAndUpdate(req.params.id, { isActive: false });
+    await UserModel.findByIdAndUpdate(req.params.id, {
+      isActive: false,
+      suspensionReason: req.body.reason || "No reason provided",
+    });
     return res.status(200).json({ success: true, message: "User suspended" });
   } catch (err) {
     return res.status(500).json({
@@ -152,7 +155,10 @@ exports.suspendUser = async (req, res) => {
 
 exports.activateUser = async (req, res) => {
   try {
-    await UserModel.findByIdAndUpdate(req.params.id, { isActive: true });
+    await UserModel.findByIdAndUpdate(req.params.id, {
+      isActive: true,
+      suspensionReason: "",
+    });
     return res.status(200).json({ success: true, message: "User activated" });
   } catch (err) {
     return res.status(500).json({

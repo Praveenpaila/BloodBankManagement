@@ -3,16 +3,16 @@ const BloodRequest = require("../models/BloodRequest");
 const { emitToRequest, emitToUser } = require("../utils/realtime");
 
 const canAccess = (conversation, userId) =>
-  String(conversation.hospital?._id || conversation.hospital) === String(userId) ||
+  String(conversation.requester?._id || conversation.requester) === String(userId) ||
   String(conversation.donor?._id || conversation.donor) === String(userId);
 
 exports.getMyConversations = async (req, res) => {
   try {
     const conversations = await ChatConversation.find({
-      $or: [{ hospital: req.user._id }, { donor: req.user._id }],
+      $or: [{ requester: req.user._id }, { donor: req.user._id }],
     })
       .populate("request", "bloodGroup unitsNeeded urgency status")
-      .populate("hospital", "firstName lastName role phoneNumber")
+      .populate("requester", "firstName lastName role phoneNumber hospitalName contactPersonName")
       .populate("donor", "firstName lastName role phoneNumber bloodGroup")
       .sort({ updatedAt: -1 });
 
@@ -32,7 +32,7 @@ exports.getConversationByRequest = async (req, res) => {
   try {
     const conversation = await ChatConversation.findOne({ request: req.params.requestId })
       .populate("request", "bloodGroup unitsNeeded urgency status")
-      .populate("hospital", "firstName lastName role phoneNumber")
+      .populate("requester", "firstName lastName role phoneNumber hospitalName contactPersonName")
       .populate("donor", "firstName lastName role phoneNumber bloodGroup")
       .populate("messages.sender", "firstName lastName role");
 
@@ -84,13 +84,13 @@ exports.sendMessage = async (req, res) => {
 
     const populated = await ChatConversation.findById(conversation._id)
       .populate("messages.sender", "firstName lastName role")
-      .populate("hospital", "firstName lastName")
+      .populate("requester", "firstName lastName")
       .populate("donor", "firstName lastName");
     const sent = populated.messages[populated.messages.length - 1];
     const recipient =
-      String(req.user._id) === String(conversation.hospital)
+      String(req.user._id) === String(conversation.requester)
         ? conversation.donor
-        : conversation.hospital;
+        : conversation.requester;
 
     emitToRequest(req.params.requestId, "chat:message", {
       requestId: req.params.requestId,

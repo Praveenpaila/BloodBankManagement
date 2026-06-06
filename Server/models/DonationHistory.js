@@ -32,6 +32,23 @@ const donationHistorySchema = new mongoose.Schema(
       unique: true,
       required: true,
     },
+    bloodRequest: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "BloodRequest",
+      unique: true,
+      sparse: true,
+    },
+    appointment: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Appointment",
+      unique: true,
+      sparse: true,
+    },
+    source: {
+      type: String,
+      enum: ["appointment", "sos", "manual"],
+      default: "manual",
+    },
     notes: String,
   },
   { timestamps: true },

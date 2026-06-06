@@ -46,6 +46,9 @@ const userSchema = new mongoose.Schema(
       trim: true,
     },
     address: String,
+    hospitalName: String,
+    pincode: String,
+    licenseNumber: String,
     emergencyContact: String,
     age: Number,
     registrationNumber: String,
@@ -70,6 +73,7 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    suspensionReason: String,
     points: {
       type: Number,
       default: 0,

@@ -18,6 +18,7 @@ const sidebarItems = {
     ['Blood Inventory', 'Stock', '/hospital/inventory'],
     ['Raise Request', 'SOS', '/hospital/raise-request'],
     ['Request Status', 'List', '/hospital/requests'],
+    ['Appointments', 'Date', '/hospital/appointments'],
     ['Donor Search', 'Find', '/hospital/donor-search'],
     ['Expiry Alerts', 'Clock', '/hospital/expiry-alerts'],
     ['Profile', 'Care', '/hospital/profile'],

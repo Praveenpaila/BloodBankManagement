@@ -31,7 +31,7 @@ const chatConversationSchema = new mongoose.Schema(
       required: true,
       unique: true,
     },
-    hospital: {
+    requester: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
@@ -46,6 +46,6 @@ const chatConversationSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-chatConversationSchema.index({ hospital: 1, donor: 1 });
+chatConversationSchema.index({ requester: 1, donor: 1 });
 
 module.exports = mongoose.model("ChatConversation", chatConversationSchema);

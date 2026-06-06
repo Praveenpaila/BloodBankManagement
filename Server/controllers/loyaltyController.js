@@ -24,13 +24,20 @@ const addBadge = async (user, badge, bonusPoints = 0) => {
 
   user.badges.push(badge);
   if (bonusPoints > 0) {
-    user.points += bonusPoints;
     await LoyaltyRecord.create({
       donor: user._id,
       action: "badge_earned",
       points: bonusPoints,
       description: `${badge} badge bonus`,
     });
+    const updated = await UserModel.findByIdAndUpdate(
+      user._id,
+      { $inc: { points: bonusPoints } },
+      { new: true },
+    );
+    if (updated) {
+      user.points = updated.points;
+    }
   }
   await createBadgeNotification(user._id, badge);
 };

@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "BloodLink",
+    "slug": "bloodlink-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "BloodLink uses your location to match nearby blood requests and donors."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#C0392B"
+      },
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "BloodLink uses your location to match nearby blood requests and donors."
+        }
+      ]
+    ],
+    "extra": {
+      "apiUrl": "http://10.0.2.2:3000/api"
+    }
+  }
+}

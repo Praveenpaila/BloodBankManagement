@@ -16,6 +16,8 @@ router.post("/resendOtp", controller.resendOtp);
 router.post("/resend-otp", controller.resendOtp);
 
 router.post("/verify-otp", controller.verifyOtp);
+router.post("/forgot-password", controller.forgotPassword);
+router.post("/reset-password", controller.resetPassword);
 router.get("/me", protect, controller.getMe);
 router.put("/me", protect, controller.updateMe);
 

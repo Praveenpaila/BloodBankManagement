@@ -21,9 +21,11 @@ import {
   DonationHistory,
   EligibilityPage,
   ExpiryAlerts,
+  HospitalAppointments,
   ForgotPasswordPage,
   HospitalDashboard,
   HospitalNotifications,
+  HospitalPendingApproval,
   HospitalProfile,
   InventoryOverview,
   NearbyRequestsPage,
@@ -41,6 +43,7 @@ const RoleRedirect = () => {
 
   if (loading) return null;
   if (!isAuthenticated) return <LandingPage />;
+  if (user.role === 'hospital' && user.isApproved === false) return <Navigate to="/hospital/pending" replace />;
   return <Navigate to={dashboardFor(user.role)} replace />;
 };
 
@@ -71,11 +74,13 @@ function App() {
       <Route path="/donor/chat/:requestId" element={<Protected role="donor"><ChatPage /></Protected>} />
 
       <Route path="/hospital/dashboard" element={<Protected role="hospital"><HospitalDashboard /></Protected>} />
+      <Route path="/hospital/pending" element={<Protected role="hospital"><HospitalPendingApproval /></Protected>} />
       <Route path="/hospital/inventory" element={<Protected role="hospital"><BloodInventory /></Protected>} />
       <Route path="/hospital/raise-request" element={<Protected role="hospital"><RaiseRequest /></Protected>} />
       <Route path="/hospital/requests" element={<Protected role="hospital"><RequestStatus /></Protected>} />
       <Route path="/hospital/donor-search" element={<Protected role="hospital"><DonorSearch /></Protected>} />
       <Route path="/hospital/expiry-alerts" element={<Protected role="hospital"><ExpiryAlerts /></Protected>} />
+      <Route path="/hospital/appointments" element={<Protected role="hospital"><HospitalAppointments /></Protected>} />
       <Route path="/hospital/profile" element={<Protected role="hospital"><HospitalProfile /></Protected>} />
       <Route path="/hospital/notifications" element={<Protected role="hospital"><HospitalNotifications /></Protected>} />
       <Route path="/hospital/chat/:requestId" element={<Protected role="hospital"><ChatPage /></Protected>} />

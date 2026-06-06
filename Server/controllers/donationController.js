@@ -1,12 +1,6 @@
 const DonationHistory = require("../models/DonationHistory");
-const UserModel = require("../models/user");
 const BloodRequest = require("../models/BloodRequest");
-const { awardPoints } = require("./loyaltyController");
-const { deferDonorAfterDonation } = require("../utils/eligibilityDeferral");
-
-const generateCertificateId = () => {
-  return `BL-${Date.now()}${Math.floor(Math.random() * 9000 + 1000)}`;
-};
+const { recordCompletedDonation } = require("../utils/recordDonation");
 
 exports.recordDonation = async (req, res) => {
   try {
@@ -19,41 +13,31 @@ exports.recordDonation = async (req, res) => {
       });
     }
 
-    const donation = await DonationHistory.create({
-      donor: donorId,
-      hospital: req.user._id,
+    let urgency = null;
+    if (requestId) {
+      const request = await BloodRequest.findById(requestId);
+      urgency = request?.urgency || null;
+    }
+
+    const result = await recordCompletedDonation({
+      donorId,
+      recordedBy: req.user._id,
       bloodGroup,
       units,
       notes,
-      certificateId: generateCertificateId(),
+      bloodRequestId: requestId || null,
+      urgency,
+      source: "manual",
     });
-
-    await UserModel.findByIdAndUpdate(donorId, {
-      $inc: { totalDonations: 1 },
-    });
-    const deferralUntil = await deferDonorAfterDonation(
-      donorId,
-      "Donation completed. Donor is deferred for 30 days.",
-    );
-    await awardPoints(donorId, "donation", 100, "Donation completed");
-
-    if (requestId) {
-      const request = await BloodRequest.findById(requestId);
-      if (request?.urgency === "critical") {
-        await awardPoints(
-          donorId,
-          "emergency_response",
-          150,
-          "Critical request response",
-        );
-      }
-    }
 
     return res.status(201).json({
       success: true,
-      data: donation,
-      deferralUntil,
-      message: "Donation recorded",
+      data: result.donation,
+      deferralUntil: result.deferralUntil,
+      loyalty: result.loyalty,
+      message: result.duplicate
+        ? "Donation was already recorded"
+        : `Donation recorded. +${result.loyalty.pointsAwarded} points earned.`,
     });
   } catch (err) {
     return res.status(500).json({
@@ -66,7 +50,8 @@ exports.recordDonation = async (req, res) => {
 exports.getMyDonationHistory = async (req, res) => {
   try {
     const donations = await DonationHistory.find({ donor: req.user._id })
-      .populate("hospital", "firstName lastName")
+      .populate("hospital", "firstName lastName hospitalName")
+      .populate("bloodRequest", "urgency status")
       .sort({ donationDate: -1 });
 
     return res.status(200).json({

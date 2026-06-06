@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import DatePicker from 'react-datepicker';
 import { format, formatDistanceToNow } from 'date-fns';
@@ -102,22 +102,57 @@ const exportCsv = (filename, rows) => {
 };
 
 export const ForgotPasswordPage = () => {
-  const [sent, setSent] = useState(false);
+  const [step, setStep] = useState('email');
+  const [form, setForm] = useState({ email: '', token: '', newPassword: '' });
+  const [loading, setLoading] = useState(false);
+
+  const requestReset = async (event) => {
+    event.preventDefault();
+    setLoading(true);
+    try {
+      await api.post('/auth/forgot-password', { email: form.email });
+      toast.success('Reset code sent');
+      setStep('reset');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Could not send reset code');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetPassword = async (event) => {
+    event.preventDefault();
+    setLoading(true);
+    try {
+      await api.post('/auth/reset-password', { token: form.token, newPassword: form.newPassword });
+      toast.success('Password reset successful');
+      setStep('done');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Could not reset password');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <main className="grid min-h-screen place-items-center p-4">
-      <form
-        className="card w-full max-w-md"
-        onSubmit={(event) => {
-          event.preventDefault();
-          setSent(true);
-          toast.success('Check your email');
-        }}
-      >
+      <form className="card w-full max-w-md" onSubmit={step === 'email' ? requestReset : resetPassword}>
         <h1 className="text-2xl font-black">Forgot Password</h1>
-        {sent ? <p className="mt-4 text-green-700">Check your email for reset instructions.</p> : (
+        {step === 'done' ? (
+          <div className="mt-4">
+            <p className="text-green-700">Your password has been reset.</p>
+            <Link className="btn-primary mt-4" to="/login">Back to Login</Link>
+          </div>
+        ) : step === 'email' ? (
           <>
-            <Field label="Email"><input className="input-field" type="email" required /></Field>
-            <button className="btn-primary mt-5 w-full">Send reset link</button>
+            <Field label="Email"><input className="input-field" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required /></Field>
+            <button className="btn-primary mt-5 w-full" disabled={loading}>{loading ? 'Sending...' : 'Send reset code'}</button>
+          </>
+        ) : (
+          <>
+            <Field label="Reset code"><input className="input-field" value={form.token} onChange={(e) => setForm({ ...form, token: e.target.value })} required /></Field>
+            <Field label="New password"><input className="input-field" type="password" value={form.newPassword} onChange={(e) => setForm({ ...form, newPassword: e.target.value })} required minLength={6} /></Field>
+            <button className="btn-primary mt-5 w-full" disabled={loading}>{loading ? 'Resetting...' : 'Reset password'}</button>
           </>
         )}
       </form>
@@ -127,7 +162,8 @@ export const ForgotPasswordPage = () => {
 
 export const DonorDashboard = () => {
   const { user } = useAuth();
-  const { data, loading } = useApi(async () => {
+  const { socket } = useSocket();
+  const { data, loading, reload } = useApi(async () => {
     const [eligibility, stats, history, notifications] = await Promise.all([
       api.get('/eligibility/status'),
       api.get('/loyalty/my-stats'),
@@ -144,10 +180,29 @@ export const DonorDashboard = () => {
 
   const status = data?.eligibility?.status || data?.eligibility?.record?.status || 'not checked';
 
+  useEffect(() => {
+    if (!socket) return undefined;
+    const refresh = () => reload();
+    const onRefresh = () => reload();
+    socket.on('eligibility:deferred', refresh);
+    socket.on('donation:recorded', refresh);
+    window.addEventListener('bloodlink:donation-recorded', onRefresh);
+    window.addEventListener('bloodlink:eligibility-deferred', onRefresh);
+    return () => {
+      socket.off('eligibility:deferred', refresh);
+      socket.off('donation:recorded', refresh);
+      window.removeEventListener('bloodlink:donation-recorded', onRefresh);
+      window.removeEventListener('bloodlink:eligibility-deferred', onRefresh);
+    };
+    // reload is provided by useApi and intentionally used only for this socket refresh.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [socket]);
+
   return (
     <DashboardLayout title={`Welcome back, ${user?.firstName || 'Donor'}`} subtitle="Your donation activity, eligibility and recent alerts.">
       {loading ? <SmallSpinner /> : (
         <div className="space-y-5">
+          {data.eligibility?.deferralUntil && <div className="card border-amber-200 bg-amber-50 text-amber-800">You are deferred for 30 days after your last donation.</div>}
           <div className="card flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-xl font-black">{user?.firstName} {user?.lastName}</h2>
@@ -178,8 +233,8 @@ export const DonorDashboard = () => {
             </div>
           </div>
           <div className="grid gap-5 lg:grid-cols-2">
-            <PageTable headers={['Date', 'Hospital', 'Blood Group']} rows={data.donations.slice(0, 5).map((item) => (
-              <tr key={item._id}><td>{fmtDate(item.donationDate)}</td><td>{item.hospital?.firstName}</td><td><BloodGroupBadge group={item.bloodGroup} size="sm" /></td></tr>
+            <PageTable headers={['Date', 'Hospital', 'Blood Group', 'Type']} rows={data.donations.slice(0, 5).map((item) => (
+              <tr key={item._id}><td>{fmtDate(item.donationDate)}</td><td>{item.hospital?.hospitalName || item.hospital?.firstName}</td><td><BloodGroupBadge group={item.bloodGroup} size="sm" /></td><td>{item.source === 'sos' ? 'SOS' : item.source === 'appointment' ? 'Appointment' : 'Regular'}</td></tr>
             ))} />
             <div className="card">
               <h3 className="text-lg font-black">Recent Notifications</h3>
@@ -253,9 +308,10 @@ export const DonorProfile = () => {
 
 export const EligibilityPage = () => {
   const { user } = useAuth();
+  const { socket } = useSocket();
   const [step, setStep] = useState(1);
   const [result, setResult] = useState(null);
-  const { data: previous } = useApi(async () => (await api.get('/eligibility/status')).data.data, []);
+  const { data: previous, reload } = useApi(async () => (await api.get('/eligibility/status')).data.data, []);
   const [form, setForm] = useState({
     age: user?.age || '',
     weight: '',
@@ -280,8 +336,18 @@ export const EligibilityPage = () => {
   const update = (field, value) => setForm((current) => ({ ...current, [field]: value }));
   const stepLabels = ['Basics', 'Health', 'Exposure', 'Vitals'];
 
+  useEffect(() => {
+    if (!socket) return undefined;
+    const refresh = () => reload();
+    socket.on('eligibility:deferred', refresh);
+    return () => socket.off('eligibility:deferred', refresh);
+    // reload is provided by useApi and intentionally used only for this socket refresh.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [socket]);
+
   return (
     <DashboardLayout title="Eligibility Check" subtitle={`Step ${step}/4`}>
+      {previous?.deferralUntil && <div className="card mb-5 border-amber-200 bg-amber-50 text-amber-800">You are deferred for 30 days after your last donation.</div>}
       {previous && <div className="status-strip mb-5"><p className="font-black">Previous result: <span className="capitalize">{(previous.status || previous.record?.status || '').replaceAll('_', ' ')}</span></p></div>}
       <div className="eligibility-card">
         <div className="eligibility-steps">
@@ -336,21 +402,59 @@ export const BookAppointment = () => {
     return { eligibility: eligibility.data.data, hospitals: hospitals.data.data, history: history.data.data };
   }, []);
   const [form, setForm] = useState({ hospital: '', date: null, timeSlot: 'Morning' });
+  const [confirmation, setConfirmation] = useState(null);
 
   const eligible = data?.eligibility?.status === 'eligible';
   const submit = async () => {
     try {
       await api.post('/appointments', form);
       toast.success('Appointment confirmed');
+      const hospital = data?.hospitals?.find((item) => item._id === form.hospital);
+      setConfirmation({
+        hospitalName: hospital?.hospitalName || hospital?.firstName || 'Selected hospital',
+        date: form.date,
+        timeSlot: form.timeSlot,
+      });
     } catch (err) {
       toast.error(err.response?.data?.message || 'Appointment failed');
     }
+  };
+
+  const addToCalendar = () => {
+    if (!confirmation?.date) return;
+    const start = new Date(confirmation.date);
+    const stamp = start.toISOString().replace(/[-:]/g, '').split('.')[0];
+    const ics = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'BEGIN:VEVENT',
+      `DTSTART:${stamp}`,
+      `SUMMARY:Blood donation appointment`,
+      `LOCATION:${confirmation.hospitalName}`,
+      `DESCRIPTION:${confirmation.timeSlot} slot at ${confirmation.hospitalName}`,
+      'END:VEVENT',
+      'END:VCALENDAR',
+    ].join('\n');
+    const blob = new Blob([ics], { type: 'text/calendar' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'bloodlink-appointment.ics';
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
     <DashboardLayout title="Book Appointment">
       {!eligible ? <div className="card border-amber-200 bg-amber-50">Complete an eligible check before booking. <Link className="font-black text-[#C0392B]" to="/donor/eligibility">Check now</Link></div> : (
         <div className="card space-y-4">
+          {confirmation && (
+            <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-green-800">
+              <p className="font-black">Appointment confirmed</p>
+              <p className="mt-1 text-sm">{confirmation.hospitalName} | {fmtDate(confirmation.date)} | {confirmation.timeSlot}</p>
+              <button type="button" className="btn-outline mt-3" onClick={addToCalendar}>Add to Calendar</button>
+            </div>
+          )}
           <Field label="Hospital"><select className="input-field" value={form.hospital} onChange={(e) => setForm({ ...form, hospital: e.target.value })}><option value="">Select hospital</option>{data?.hospitals?.map((item) => <option value={item._id} key={item._id}>{item.firstName}</option>)}</select></Field>
           <Field label="Date"><DatePicker className="input-field" minDate={new Date()} selected={form.date} onChange={(date) => setForm({ ...form, date })} /></Field>
           <div className="grid gap-3 md:grid-cols-3">{['Morning', 'Afternoon', 'Evening'].map((slot) => <button type="button" key={slot} className={form.timeSlot === slot ? 'btn-primary' : 'btn-outline'} onClick={() => setForm({ ...form, timeSlot: slot })}>{slot}</button>)}</div>
@@ -363,7 +467,19 @@ export const BookAppointment = () => {
 
 export const DonationHistory = () => {
   const { user } = useAuth();
-  const { data, loading } = useApi(async () => (await api.get('/donations/my-history')).data, []);
+  const { socket } = useSocket();
+  const { data, loading, reload } = useApi(async () => (await api.get('/donations/my-history')).data, []);
+  useEffect(() => {
+    if (!socket) return undefined;
+    const refresh = () => reload();
+    socket.on('donation:recorded', refresh);
+    window.addEventListener('bloodlink:donation-recorded', refresh);
+    return () => {
+      socket.off('donation:recorded', refresh);
+      window.removeEventListener('bloodlink:donation-recorded', refresh);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [socket]);
   const donations = data?.data || [];
   const months = new Set(donations.map((item) => format(new Date(item.donationDate), 'yyyy-MM')));
 
@@ -372,9 +488,16 @@ export const DonationHistory = () => {
       {loading ? <SmallSpinner /> : (
         <div className="space-y-5">
           <div className="page-grid"><StatCard label="Total Donations" value={data.totalDonations} /><StatCard label="Lives Impacted" value={data.totalDonations * 3} /><StatCard label="Donation Streak" value={`${months.size} months`} /></div>
-          <PageTable headers={['Date', 'Hospital', 'Blood Group', 'Units', 'Certificate']} rows={donations.map((item) => (
-            <tr key={item._id}><td>{fmtDate(item.donationDate)}</td><td>{item.hospital?.firstName}</td><td><BloodGroupBadge group={item.bloodGroup} size="sm" /></td><td>{item.units}</td><td><button className="btn-outline" onClick={() => window.print()}>{item.certificateId}</button></td></tr>
-          ))} />
+          {donations.length === 0 ? (
+            <div className="card text-center">
+              <p className="font-black">You haven't donated yet. Book your first appointment!</p>
+              <Link className="btn-primary mt-4" to="/donor/appointments">Book Appointment</Link>
+            </div>
+          ) : (
+            <PageTable headers={['Date', 'Hospital', 'Blood Group', 'Units', 'Type', 'Certificate']} rows={donations.map((item) => (
+              <tr key={item._id}><td>{fmtDate(item.donationDate)}</td><td>{item.hospital?.hospitalName || item.hospital?.firstName}</td><td><BloodGroupBadge group={item.bloodGroup} size="sm" /></td><td>{item.units}</td><td><span className={`badge-pill ${item.source === 'sos' ? 'bg-red-50 text-red-700' : item.source === 'appointment' ? 'bg-blue-50 text-blue-700' : 'bg-green-50 text-green-700'}`}>{item.source === 'sos' ? 'SOS' : item.source === 'appointment' ? 'Appointment' : 'Regular'}</span></td><td><button className="btn-outline" onClick={() => window.print()}>{item.certificateId}</button></td></tr>
+            ))} />
+          )}
           <div className="card print:block">
             <h3 className="text-xl font-black">Certificate Preview</h3>
             <p className="mt-2">This certifies that {user?.firstName} donated blood through BloodLink. Thank you for saving lives.</p>
@@ -387,10 +510,22 @@ export const DonationHistory = () => {
 
 export const BadgesPage = () => {
   const { user } = useAuth();
-  const { data, loading } = useApi(async () => {
+  const { socket } = useSocket();
+  const { data, loading, reload } = useApi(async () => {
     const [stats, leaderboard] = await Promise.all([api.get('/loyalty/my-stats'), api.get('/loyalty/leaderboard')]);
     return { stats: stats.data.data, leaderboard: leaderboard.data.data };
   }, []);
+  useEffect(() => {
+    if (!socket) return undefined;
+    const refresh = () => reload();
+    socket.on('donation:recorded', refresh);
+    window.addEventListener('bloodlink:donation-recorded', refresh);
+    return () => {
+      socket.off('donation:recorded', refresh);
+      window.removeEventListener('bloodlink:donation-recorded', refresh);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [socket]);
   const allBadges = ['First Drop', 'Life Saver', 'Blood Hero', 'Rare Type', 'Monthly Champion', 'Emergency Responder'];
 
   return (
@@ -465,12 +600,13 @@ const NotificationsView = ({ title }) => {
           {item.type === 'blood_request' && item.data?.closed && <p className="mt-3 text-sm font-bold text-slate-500">Covered by {item.data?.acceptedDonorName || 'another donor'}</p>}
           {item.type === 'donor_response' && item.data?.requestId && <button className="btn-outline mt-3" onClick={() => navigate(`/${user.role}/chat/${item.data.requestId}`)}>Open Chat</button>}
         </div>
-      ))}{(!data || data.length === 0) && <Empty text="No notifications." />}</div>
+      ))}{(!data || data.length === 0) && <Empty text="You're all caught up. No new notifications." />}</div>
     </DashboardLayout>
   );
 };
 
 export const NearbyRequestsPage = () => {
+  const navigate = useNavigate();
   const { user, updateUser } = useAuth();
   const coords = user?.location?.coordinates;
   const { data, reload } = useApi(async () => {
@@ -479,6 +615,16 @@ export const NearbyRequestsPage = () => {
       params: { lat: coords[1], lng: coords[0] },
     })).data.data;
   }, [coords?.join(',')]);
+
+  const acceptRequest = async (requestId) => {
+    try {
+      const { data: response } = await api.put(`/blood-requests/${requestId}/respond`, { action: 'accept' });
+      toast.success('Request accepted');
+      navigate(`/donor/chat/${response?.data?.request?._id || requestId}`);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Could not accept request');
+    }
+  };
 
   const enable = () => {
     if (!navigator.geolocation) {
@@ -507,18 +653,19 @@ export const NearbyRequestsPage = () => {
       {!coords?.length ? <div className="card"><p className="font-black">Enable your location to see nearby requests.</p><button className="btn-primary mt-4" onClick={enable}>Update Location</button></div> : (
         <div className="grid gap-5 lg:grid-cols-[3fr_2fr]">
           <div className="card min-h-96">{import.meta.env.VITE_GOOGLE_MAPS_API_KEY ? 'Map view is ready for configured Google Maps key.' : 'Google Maps API key is not set. Nearby requests are listed on the right.'}</div>
-          <div className="space-y-3">{(data || []).filter(Boolean).map((item, index) => <RequestCard key={item._id || `request-${index}`} request={item} />)}{(!data || data.length === 0) && <Empty text="No nearby open requests." />}</div>
+          <div className="space-y-3">{(data || []).filter(Boolean).map((item, index) => <RequestCard key={item._id || `request-${index}`} request={item} onAccept={item.status === 'open' ? () => acceptRequest(item._id) : undefined} />)}{(!data || data.length === 0) && <Empty text="No blood requests near you right now. You'll be notified when someone needs help." />}</div>
         </div>
       )}
     </DashboardLayout>
   );
 };
 
-const RequestCard = ({ request }) => (
+const RequestCard = ({ request, onAccept }) => (
   <div className="card">
     <div className="flex items-center justify-between"><BloodGroupBadge group={request.bloodGroup} /><span className={`badge-pill ${urgencyClass(request.urgency)}`}>{request.urgency}</span></div>
     <p className="mt-3 font-bold">{request.requestedBy?.firstName || 'Hospital'}</p>
     <p className="text-sm text-slate-500">{request.unitsNeeded} unit(s), {formatDistanceToNow(new Date(request.createdAt), { addSuffix: true })}</p>
+    {onAccept && <button className="btn-primary mt-3" type="button" onClick={onAccept}>Accept Request</button>}
   </div>
 );
 
@@ -529,9 +676,10 @@ export const HospitalDashboard = () => {
     return { inventory: inventory.data.data, requests: requests.data.data, expiry: expiry.data.data };
   }, []);
   const totals = BLOOD_GROUPS.map((group) => ({ group, units: (data?.inventory || []).filter((i) => i.bloodGroup === group).reduce((sum, i) => sum + i.units, 0) }));
+  if (user?.isApproved === false) return <HospitalPendingApproval />;
   return (
     <DashboardLayout title="Hospital Dashboard">
-      {user?.isApproved === false && <div className="card mb-5 border-amber-200 bg-amber-50">Approval pending. Admin approval is required for full operations.</div>}
+      {user?.isActive === false && <div className="card mb-5 border-red-200 bg-red-50 text-red-800">Your account has been suspended. Reason: {user.suspensionReason || 'No reason provided'}. Contact support.</div>}
       <div className="page-grid">{totals.map(({ group, units }) => <div key={group} className="card"><BloodGroupBadge group={group} /><p className={`mt-3 text-3xl font-black ${units < 5 ? 'text-red-700' : units <= 10 ? 'text-amber-700' : 'text-green-700'}`}>{units}</p><div className="mt-2 h-2 rounded-full bg-slate-100"><div className="h-2 rounded-full bg-[#C0392B]" style={{ width: `${Math.min(units * 5, 100)}%` }} /></div></div>)}</div>
       <div className="page-grid mt-5"><StatCard label="Open Requests" value={(data?.requests || []).filter((r) => r.status === 'open').length} /><StatCard label="Fulfilled Today" value={(data?.requests || []).filter((r) => r.status === 'fulfilled').length} /><StatCard label="Expiry Alerts" value={(data?.expiry || []).length} /></div>
     </DashboardLayout>
@@ -566,8 +714,10 @@ export const BloodInventory = () => {
 
 export const RaiseRequest = () => {
   const { user, updateUser } = useAuth();
+  const { socket } = useSocket();
   const [form, setForm] = useState({ bloodGroup: 'O+', urgency: 'normal', unitsNeeded: 1, radiusKm: 10, notes: '' });
   const [requestingLocation, setRequestingLocation] = useState(false);
+  const [activeRequest, setActiveRequest] = useState(null);
   const coords = user?.location?.coordinates;
   const hasLocation = coords?.length >= 2;
   const { data: count, reload } = useApi(async () => {
@@ -625,12 +775,39 @@ export const RaiseRequest = () => {
         lng: coords[0],
       });
       toast.success(`SOS sent to ${data.data.notifiedDonors} donors by ${data.data.matchingAlgorithm}`);
+      setActiveRequest(data.data.request);
       reload();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Request failed');
     }
   };
+  useEffect(() => {
+    if (!socket || !activeRequest?._id) return undefined;
+    const syncRequest = async () => {
+      try {
+        const { data } = await api.get('/blood-requests');
+        const updated = (data.data || []).find((item) => item._id === activeRequest._id);
+        if (updated) setActiveRequest(updated);
+      } catch {
+        // Keep the last known request state if refresh fails.
+      }
+    };
+    socket.on('blood-request:response', syncRequest);
+    return () => socket.off('blood-request:response', syncRequest);
+  }, [socket, activeRequest?._id]);
+
   const isDonorSos = user?.role === 'donor';
+  const cancelRequest = async () => {
+    if (!activeRequest?._id) return;
+    try {
+      const { data } = await api.put(`/blood-requests/${activeRequest._id}/status`, { status: 'cancelled' });
+      setActiveRequest(data.data);
+      toast.success('Request cancelled');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Could not cancel request');
+    }
+  };
+
   return (
     <DashboardLayout title={isDonorSos ? 'Emergency Blood SOS' : 'Raise Blood Request'} subtitle="Dispatch an urgent donor alert and connect with the first accepting donor.">
       {!hasLocation && (
@@ -658,8 +835,14 @@ export const RaiseRequest = () => {
             <div>
               <p className="text-sm font-bold text-slate-500">Matching eligible donors</p>
               <p className="text-3xl font-black text-red-700">{count || 0}</p>
+              <p className="mt-1 text-sm font-bold text-slate-600">{count || 0} eligible donors found in this area</p>
+              {count === 0 && Number(form.radiusKm) < 50 && <p className="mt-1 text-sm text-amber-700">No eligible donors found. Try increasing the radius.</p>}
+              {count === 0 && Number(form.radiusKm) >= 50 && <p className="mt-1 text-sm text-red-700">No eligible donors found at max radius. Contact hospitals directly.</p>}
             </div>
-            <button className="btn-primary" onClick={submit} disabled={!hasLocation}>{isDonorSos ? 'Raise Emergency SOS' : 'Request Blood'}</button>
+            <div className="flex flex-wrap gap-2">
+              <button className="btn-primary" onClick={submit} disabled={!hasLocation}>{isDonorSos ? 'Raise Emergency SOS' : 'Request Blood'}</button>
+              {isDonorSos && activeRequest?.status === 'open' && <button className="btn-outline" type="button" onClick={cancelRequest}>Cancel Request</button>}
+            </div>
           </div>
         </div>
       </div>
@@ -677,6 +860,7 @@ export const ChatPage = () => {
   const [conversation, setConversation] = useState(null);
   const [message, setMessage] = useState('');
   const [completing, setCompleting] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   const load = async () => {
     try {
@@ -721,23 +905,46 @@ export const ChatPage = () => {
     }
   };
 
-  const requesterId = conversation?.hospital?._id || conversation?.hospital;
+  const requester = conversation?.requester;
+  const requesterId = requester?._id || requester;
   const isRequester = String(requesterId) === String(user?._id);
-  const other = isRequester ? conversation?.donor : conversation?.hospital;
+  const other = isRequester ? conversation?.donor : requester;
 
   const completeDonation = async () => {
     setCompleting(true);
     try {
       const { data } = await api.put(`/blood-requests/${requestId}/complete-donation`);
+      const loyalty = data.data?.loyalty;
       setConversation((current) => current ? {
         ...current,
         request: { ...current.request, status: data.data.request.status },
       } : current);
-      toast.success('Donation completed. Donor deferred for 30 days.');
+      toast.success(
+        loyalty
+          ? `Donation recorded! +${loyalty.pointsAwarded} points. Total donations: ${loyalty.totalDonations}. Badges: ${(loyalty.badges || []).join(', ') || 'none yet'}.`
+          : 'Donation completed. Donor deferred for 30 days.',
+        { duration: 8000 },
+      );
     } catch (err) {
       toast.error(err.response?.data?.message || 'Could not complete donation');
     } finally {
       setCompleting(false);
+    }
+  };
+
+  const resetNoShow = async () => {
+    setResetting(true);
+    try {
+      const { data } = await api.put(`/blood-requests/${requestId}/status`, { status: 'open' });
+      setConversation((current) => current ? {
+        ...current,
+        request: { ...current.request, status: data.data.status, acceptedDonor: data.data.acceptedDonor },
+      } : current);
+      toast.success('Request reopened for other donors.');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Could not reopen request');
+    } finally {
+      setResetting(false);
     }
   };
 
@@ -750,9 +957,14 @@ export const ChatPage = () => {
             <h2>{other?.firstName} {other?.lastName}</h2>
             <p>{other?.phoneNumber || 'Phone not shared'}</p>
             <span className={`badge-pill ${urgencyClass(conversation.request?.urgency)}`}>{conversation.request?.urgency}</span>
-            {isRequester && conversation.request?.status !== 'fulfilled' && (
+            {isRequester && conversation.request?.status === 'responding' && (
               <button className="btn-primary mt-4 w-full" disabled={completing} onClick={completeDonation}>
                 {completing ? 'Completing...' : 'Mark Donation Completed'}
+              </button>
+            )}
+            {isRequester && conversation.request?.status === 'responding' && (
+              <button className="btn-outline mt-3 w-full" disabled={resetting} onClick={resetNoShow}>
+                {resetting ? 'Reopening...' : "Donor didn't show up"}
               </button>
             )}
           </aside>
@@ -781,6 +993,7 @@ export const ChatPage = () => {
 
 const RequestsList = ({ admin = false }) => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const endpoint = admin ? '/admin/requests' : '/blood-requests';
   const { data, reload } = useApi(async () => (await api.get(endpoint)).data, []);
   const rows = admin ? data?.data || [] : data?.data || [];
@@ -791,10 +1004,24 @@ const RequestsList = ({ admin = false }) => {
   };
   return (
     <DashboardLayout title={admin ? 'Requests Log' : 'Request Status'}>
-      <PageTable headers={['Hospital', 'Blood', 'Units', 'Urgency', 'Status', 'Notified', 'Date', 'Actions']} rows={rows.filter(Boolean).map((item, index) => <tr key={item._id || `request-${index}`}><td>{item.requestedBy?.firstName}</td><td><BloodGroupBadge group={item.bloodGroup} size="sm" /></td><td>{item.unitsNeeded}</td><td><span className={`badge-pill ${urgencyClass(item.urgency)}`}>{item.urgency}</span></td><td>{item.status}</td><td>{item.notifiedDonors?.length || 0}</td><td>{fmtDate(item.createdAt)}</td><td><div className="flex gap-2">{!admin && item.status === 'responding' && item._id && <button className="btn-outline" onClick={() => navigate(`/hospital/chat/${item._id}`)}>Chat</button>}{!admin && item.status === 'responding' && item._id && <button className="btn-outline" onClick={() => setStatus(item._id, 'fulfilled')}>Mark Fulfilled</button>}</div></td></tr>)} />
+      <PageTable headers={['Hospital', 'Blood', 'Units', 'Urgency', 'Status', 'Notified', 'Date', 'Actions']} rows={rows.filter(Boolean).map((item, index) => {
+        const acceptedDonor = item.acceptedDonor || item.respondingDonors?.find((entry) => entry.action === 'accept')?.donor;
+        const canOpenChat = Boolean(!admin && item._id && acceptedDonor);
+        const canFulfill = Boolean(!admin && item.status === 'responding' && item._id);
+        return <tr key={item._id || `request-${index}`}><td>{item.requestedBy?.firstName}</td><td><BloodGroupBadge group={item.bloodGroup} size="sm" /></td><td>{item.unitsNeeded}</td><td><span className={`badge-pill ${urgencyClass(item.urgency)}`}>{item.urgency}</span></td><td>{item.status}</td><td>{item.notifiedDonors?.length || 0}</td><td>{fmtDate(item.createdAt)}</td><td><div className="flex gap-2">{canOpenChat && <button className="btn-outline" onClick={() => navigate(`/${user?.role || 'hospital'}/chat/${item._id}`)}>Chat</button>}{canFulfill && <button className="btn-outline" onClick={() => setStatus(item._id, 'fulfilled')}>Mark Fulfilled</button>}</div></td></tr>;
+      })} />
     </DashboardLayout>
   );
 };
+
+export const HospitalPendingApproval = () => (
+  <DashboardLayout title="Pending Approval">
+    <div className="card border-amber-200 bg-amber-50 text-amber-900">
+      <p className="text-lg font-black">Your account is pending admin approval.</p>
+      <p className="mt-2">You'll receive a notification once approved.</p>
+    </div>
+  </DashboardLayout>
+);
 
 export const DonorSearch = () => {
   const [query, setQuery] = useState({ bloodGroup: '', city: '' });
@@ -807,6 +1034,48 @@ export const DonorSearch = () => {
     <DashboardLayout title="Donor Search">
       <div className="card mb-5 grid gap-3 md:grid-cols-3"><select className="input-field" value={query.bloodGroup} onChange={(e) => setQuery({ ...query, bloodGroup: e.target.value })}><option value="">Any blood group</option>{BLOOD_GROUPS.map((g) => <option key={g}>{g}</option>)}</select><input className="input-field" placeholder="City" value={query.city} onChange={(e) => setQuery({ ...query, city: e.target.value })} /><button className="btn-primary" onClick={search}>Search</button></div>
       <div className="page-grid">{results.map((item) => <div className="card" key={item._id}><h3 className="font-black">{item.firstName}</h3><BloodGroupBadge group={item.bloodGroup} /><p className="mt-2 text-sm">{item.city}</p><button className="btn-outline mt-3" onClick={() => toast.success('Direct notification ready')}>Request This Donor</button></div>)}</div>
+    </DashboardLayout>
+  );
+};
+
+export const HospitalAppointments = () => {
+  const { data, reload } = useApi(async () => (await api.get('/appointments')).data.data, []);
+  const complete = async (id) => {
+    try {
+      const { data: response } = await api.put(`/appointments/${id}/complete`);
+      const loyalty = response.data?.loyalty;
+      toast.success(
+        loyalty
+          ? `Donation recorded! Donor earned +${loyalty.pointsAwarded} points.`
+          : 'Appointment marked as donated.',
+      );
+      reload();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Could not record donation');
+    }
+  };
+  return (
+    <DashboardLayout title="Appointments">
+      <PageTable
+        headers={['Donor', 'Blood', 'Date', 'Slot', 'Status', 'Actions']}
+        rows={(data || []).map((item) => (
+          <tr key={item._id}>
+            <td>{item.donor?.firstName} {item.donor?.lastName}</td>
+            <td><BloodGroupBadge group={item.donor?.bloodGroup} size="sm" /></td>
+            <td>{fmtDate(item.date)}</td>
+            <td>{item.timeSlot}</td>
+            <td>{item.status}</td>
+            <td>
+              {item.status === 'scheduled' && (
+                <button className="btn-primary" type="button" onClick={() => complete(item._id)}>
+                  Mark Donated
+                </button>
+              )}
+            </td>
+          </tr>
+        ))}
+        empty="No appointments yet."
+      />
     </DashboardLayout>
   );
 };
@@ -827,9 +1096,45 @@ export const ExpiryAlerts = () => {
   );
 };
 
-export const HospitalProfile = () => <DonorProfile />;
+export const HospitalProfile = () => {
+  const { user, updateUser } = useAuth();
+  const [form, setForm] = useState({
+    hospitalName: user?.hospitalName || user?.firstName || '',
+    address: user?.address || '',
+    city: user?.city || '',
+    pincode: user?.pincode || '',
+    phoneNumber: user?.phoneNumber || '',
+    licenseNumber: user?.licenseNumber || user?.registrationNumber || '',
+  });
+
+  const save = async (event) => {
+    event.preventDefault();
+    try {
+      const { data } = await api.put('/auth/me', form);
+      updateUser(data.data);
+      toast.success('Hospital profile updated');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Profile update failed');
+    }
+  };
+
+  return (
+    <DashboardLayout title="Hospital Profile">
+      <form className="card grid gap-4 md:grid-cols-2" onSubmit={save}>
+        <Field label="Hospital name"><input className="input-field" value={form.hospitalName} onChange={(e) => setForm({ ...form, hospitalName: e.target.value })} required /></Field>
+        <Field label="Phone"><input className="input-field" value={form.phoneNumber} onChange={(e) => setForm({ ...form, phoneNumber: e.target.value })} required /></Field>
+        <Field label="City"><input className="input-field" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} required /></Field>
+        <Field label="Pincode"><input className="input-field" value={form.pincode} onChange={(e) => setForm({ ...form, pincode: e.target.value })} /></Field>
+        <Field label="License number"><input className="input-field" value={form.licenseNumber} onChange={(e) => setForm({ ...form, licenseNumber: e.target.value })} /></Field>
+        <Field label="Address"><textarea className="input-field" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></Field>
+        <div className="md:col-span-2"><button className="btn-primary">Save Profile</button></div>
+      </form>
+    </DashboardLayout>
+  );
+};
 
 export const AdminDashboard = () => {
+  const navigate = useNavigate();
   const { data } = useApi(async () => {
     const [stats, analytics, inventory, pending] = await Promise.all([api.get('/admin/stats'), api.get('/admin/analytics'), api.get('/admin/inventory'), api.get('/admin/users?role=hospital&limit=5')]);
     return { stats: stats.data.data, analytics: analytics.data.data, inventory: inventory.data.data, pending: pending.data.data.filter((u) => !u.isApproved) };
@@ -837,7 +1142,19 @@ export const AdminDashboard = () => {
   return (
     <DashboardLayout title="Admin Dashboard">
       <div className="page-grid">{['totalUsers', 'totalDonors', 'totalHospitals', 'totalBloodUnits', 'requestsToday', 'fulfilledToday', 'pendingHospitalApprovals'].map((key) => <StatCard key={key} label={key} value={data?.stats?.[key]} />)}</div>
-      {data?.inventory?.critical?.length > 0 && <div className="card mt-5 border-red-200 bg-red-50">Critical shortage: {data.inventory.critical.map((i) => i.bloodGroup).join(', ')}</div>}
+      {data?.inventory?.critical?.length > 0 && (
+        <div className="card mt-5 border-red-200 bg-red-50">
+          <h2 className="text-lg font-black text-red-800">Critical shortages</h2>
+          <div className="mt-3 grid gap-3">
+            {data.inventory.critical.map((item) => (
+              <div key={item.bloodGroup} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-100 bg-white p-3">
+                <div><BloodGroupBadge group={item.bloodGroup} size="sm" /><p className="mt-1 text-sm text-slate-600">{item.totalUnits || 0} units available</p></div>
+                <button className="btn-outline" onClick={() => navigate('/admin/broadcast', { state: { bloodGroup: item.bloodGroup } })}>Broadcast Alert</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="mt-5 grid gap-5 lg:grid-cols-2"><Chart title="Donations By Month" data={data?.analytics?.donationsByMonth?.map((i) => ({ name: `${i._id.month}/${i._id.year}`, value: i.count })) || []} /><PieBox title="Blood Group Distribution" data={data?.analytics?.bloodGroupDistribution?.map((i) => ({ name: i._id, value: i.count })) || []} /></div>
     </DashboardLayout>
   );
@@ -845,12 +1162,37 @@ export const AdminDashboard = () => {
 
 export const UserManagement = () => {
   const [role, setRole] = useState('');
+  const [suspending, setSuspending] = useState(null);
+  const [reason, setReason] = useState('');
   const { data, reload } = useApi(async () => (await api.get(`/admin/users?role=${role}`)).data.data, [role]);
-  const action = async (id, name) => { await api.put(`/admin/users/${id}/${name}`); toast.success(`User ${name}d`); reload(); };
+  const action = async (id, name, body = {}) => { await api.put(`/admin/users/${id}/${name}`, body); toast.success(`User ${name}d`); reload(); };
+  const openSuspend = (user) => {
+    setSuspending(user);
+    setReason('');
+  };
+  const confirmSuspend = async (event) => {
+    event.preventDefault();
+    if (!suspending?._id) return;
+    await action(suspending._id, 'suspend', { reason });
+    setSuspending(null);
+  };
   return (
     <DashboardLayout title="User Management">
       <div className="mb-4 flex flex-wrap gap-2">{['', 'donor', 'hospital', 'organization', 'admin'].map((r) => <button key={r || 'all'} className={role === r ? 'btn-primary' : 'btn-outline'} onClick={() => setRole(r)}>{r || 'All'}</button>)}</div>
-      <PageTable headers={['Name', 'Email', 'Role', 'Status', 'Joined', 'Actions']} rows={(data || []).map((u) => <tr key={u._id}><td>{u.firstName} {u.lastName}</td><td>{u.email}</td><td>{u.role}</td><td>{u.isActive ? 'Active' : 'Suspended'} {u.role === 'hospital' && !u.isApproved ? '/ Pending' : ''}</td><td>{fmtDate(u.createdAt)}</td><td className="flex gap-2">{u.role === 'hospital' && !u.isApproved && <button className="btn-outline" onClick={() => action(u._id, 'approve')}>Approve</button>}<button className="btn-outline" onClick={() => action(u._id, u.isActive ? 'suspend' : 'activate')}>{u.isActive ? 'Suspend' : 'Activate'}</button></td></tr>)} />
+      <PageTable headers={['Name', 'Email', 'Role', 'Status', 'Joined', 'Actions']} rows={(data || []).map((u) => <tr key={u._id}><td>{u.firstName} {u.lastName}</td><td>{u.email}</td><td>{u.role}</td><td>{u.isActive ? 'Active' : 'Suspended'} {u.role === 'hospital' && !u.isApproved ? '/ Pending' : ''}</td><td>{fmtDate(u.createdAt)}</td><td className="flex gap-2">{u.role === 'hospital' && !u.isApproved && <button className="btn-outline" onClick={() => action(u._id, 'approve')}>Approve</button>}<button className="btn-outline" onClick={() => u.isActive ? openSuspend(u) : action(u._id, 'activate')}>{u.isActive ? 'Suspend' : 'Activate'}</button></td></tr>)} />
+      {suspending && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-900/40 p-4">
+          <form className="card w-full max-w-md" onSubmit={confirmSuspend}>
+            <h2 className="text-xl font-black">Suspend user</h2>
+            <p className="mt-1 text-sm text-slate-500">{suspending.firstName} {suspending.lastName}</p>
+            <Field label="Reason"><textarea className="input-field mt-3" value={reason} onChange={(e) => setReason(e.target.value)} required /></Field>
+            <div className="mt-4 flex justify-end gap-2">
+              <button type="button" className="btn-outline" onClick={() => setSuspending(null)}>Cancel</button>
+              <button className="btn-primary">Suspend</button>
+            </div>
+          </form>
+        </div>
+      )}
     </DashboardLayout>
   );
 };
@@ -873,7 +1215,14 @@ export const DonorAnalytics = () => {
 };
 
 export const BroadcastAlerts = () => {
-  const [form, setForm] = useState({ targetRole: '', targetBloodGroup: '', title: '', message: '' });
+  const location = useLocation();
+  const prefillBloodGroup = location.state?.bloodGroup || '';
+  const [form, setForm] = useState({
+    targetRole: prefillBloodGroup ? 'donor' : '',
+    targetBloodGroup: prefillBloodGroup,
+    title: prefillBloodGroup ? `${prefillBloodGroup} blood urgently needed` : '',
+    message: prefillBloodGroup ? `BloodLink has a critical shortage of ${prefillBloodGroup}. Please donate if you are eligible.` : '',
+  });
   const send = async () => {
     try {
       const { data } = await api.post('/admin/broadcast', form);

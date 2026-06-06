@@ -10,6 +10,6 @@ router.get("/nearby", protect, restrictTo("donor"), controller.getNearbyRequests
 router.post("/", protect, restrictTo("hospital", "donor"), controller.createRequest);
 router.put("/:id/respond", protect, restrictTo("donor"), controller.respondToRequest);
 router.put("/:id/complete-donation", protect, restrictTo("hospital", "donor"), controller.completeDonationForRequest);
-router.put("/:id/status", protect, restrictTo("hospital"), controller.updateRequestStatus);
+router.put("/:id/status", protect, restrictTo("hospital", "donor"), controller.updateRequestStatus);
 
 module.exports = router;

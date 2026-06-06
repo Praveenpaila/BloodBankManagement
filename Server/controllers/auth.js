@@ -3,6 +3,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const otpGenerator = require("otp-generator");
 const nodemailer = require("nodemailer");
+const crypto = require("crypto");
 
 const otpStore = {};
 
@@ -167,6 +168,9 @@ exports.signup = async (req, res) => {
       role = "donor",
       registrationNumber,
       address,
+      hospitalName,
+      pincode,
+      licenseNumber,
     } = req.body;
     const { email, phoneNumber } = normalizedContact;
 
@@ -221,6 +225,9 @@ exports.signup = async (req, res) => {
       role,
       registrationNumber,
       address,
+      hospitalName,
+      pincode,
+      licenseNumber,
       isVerified: true,
       isApproved: role !== "hospital",
     });
@@ -260,7 +267,9 @@ exports.Login = async (req, res) => {
     if (!user.isActive) {
       return res.status(403).json({
         success: false,
-        message: "Account suspended",
+        message: user.suspensionReason
+          ? `Account suspended. Reason: ${user.suspensionReason}`
+          : "Account suspended",
       });
     }
 
@@ -298,7 +307,18 @@ exports.getMe = async (req, res) => {
 
 exports.updateMe = async (req, res) => {
   try {
-    const allowedFields = ["firstName", "lastName", "phoneNumber", "city", "bloodGroup", "address"];
+    const allowedFields = [
+      "firstName",
+      "lastName",
+      "phoneNumber",
+      "city",
+      "bloodGroup",
+      "address",
+      "hospitalName",
+      "pincode",
+      "licenseNumber",
+      "registrationNumber",
+    ];
     const updates = {};
 
     allowedFields.forEach((field) => {
@@ -321,6 +341,101 @@ exports.updateMe = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: err.message || "Error updating profile",
+    });
+  }
+};
+
+exports.forgotPassword = async (req, res) => {
+  try {
+    const { email } = normalizeContactData(req.body);
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Provide email",
+      });
+    }
+
+    const user = await UserModel.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    const token = otpGenerator.generate(6, {
+      upperCaseAlphabets: false,
+      lowerCaseAlphabets: false,
+      specialChars: false,
+    });
+
+    user.resetPasswordToken = crypto.createHash("sha256").update(token).digest("hex");
+    user.resetPasswordExpire = Date.now() + 10 * 60 * 1000;
+    await user.save();
+
+    if ((process.env.EMAIL_USER || process.env.SMTP_USER) && (process.env.EMAIL_PASS || process.env.SMTP_PASS)) {
+      await transporter.sendMail({
+        from:
+          process.env.SMTP_FROM ||
+          `"BloodLink" <${process.env.EMAIL_USER || process.env.SMTP_USER}>`,
+        to: email,
+        subject: "BloodLink password reset",
+        html: `<div><h2>Your reset code is ${token}</h2><p>This code expires in 10 minutes.</p></div>`,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Password reset code sent",
+      data: process.env.NODE_ENV === "development" ? { token } : undefined,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: err.message || "Error sending password reset code",
+    });
+  }
+};
+
+exports.resetPassword = async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Provide reset token and new password",
+      });
+    }
+
+    const hashedToken = crypto.createHash("sha256").update(String(token)).digest("hex");
+    const user = await UserModel.findOne({
+      resetPasswordToken: hashedToken,
+      resetPasswordExpire: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or expired reset token",
+      });
+    }
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Password reset successful",
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: err.message || "Error resetting password",
     });
   }
 };

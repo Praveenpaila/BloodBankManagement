@@ -121,7 +121,25 @@ export const SocketProvider = ({ children }) => {
     socket.on('chat:ready', ({ requestId } = {}) => {
       if (!requestId) return;
       const base = user?.role === 'hospital' ? '/hospital/chat' : '/donor/chat';
-      toast.success(`Chat is ready for request ${String(requestId).slice(-6)}`);
+      toast.custom((t) => (
+        <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} alert-toast`}>
+          <div>
+            <p className="alert-toast__eyebrow">Chat ready</p>
+            <p className="alert-toast__title">Request {String(requestId).slice(-6)}</p>
+            <p className="alert-toast__message">A donor accepted. You can open the request chat now.</p>
+            <button
+              type="button"
+              className="btn-primary mt-3"
+              onClick={() => {
+                toast.dismiss(t.id);
+                navigate(`${base}/${requestId}`);
+              }}
+            >
+              Open Chat
+            </button>
+          </div>
+        </div>
+      ), { duration: 10000 });
       window.dispatchEvent(new CustomEvent('bloodlink:chat-ready', { detail: { requestId, base } }));
     });
 
@@ -129,9 +147,19 @@ export const SocketProvider = ({ children }) => {
       toast(message?.message || 'New chat message');
     });
 
+    socket.on('donation:recorded', ({ pointsAwarded, totalDonations, badges, certificateId } = {}) => {
+      const badgeText = badges?.length ? ` Badges: ${badges.join(', ')}.` : '';
+      toast.success(
+        `Donation recorded! +${pointsAwarded || 0} points. Total donations: ${totalDonations || 0}.${badgeText}${certificateId ? ` Certificate: ${certificateId}` : ''}`,
+        { duration: 8000 },
+      );
+      window.dispatchEvent(new CustomEvent('bloodlink:donation-recorded'));
+    });
+
     socket.on('eligibility:deferred', ({ deferralUntil } = {}) => {
       if (!deferralUntil) return;
       toast.success(`Donation completed. Eligible again after ${new Date(deferralUntil).toLocaleDateString()}.`);
+      window.dispatchEvent(new CustomEvent('bloodlink:eligibility-deferred'));
     });
 
     return () => {
