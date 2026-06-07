@@ -29,11 +29,51 @@ const transporter = nodemailer.createTransport({
 
 const isEmailConfigured = () =>
   process.env.EMAIL_ENABLED !== "false" &&
-  Boolean(process.env.SMTP_HOST || process.env.EMAIL_HOST) &&
-  Boolean(process.env.SMTP_USER || process.env.EMAIL_USER) &&
-  Boolean(process.env.SMTP_PASS || process.env.EMAIL_PASS);
+  (Boolean(process.env.RESEND_API_KEY) ||
+    (Boolean(process.env.SMTP_HOST || process.env.EMAIL_HOST) &&
+      Boolean(process.env.SMTP_USER || process.env.EMAIL_USER) &&
+      Boolean(process.env.SMTP_PASS || process.env.EMAIL_PASS)));
 
 const canExposeDevCode = () => process.env.NODE_ENV === "development";
+
+const getEmailFrom = () =>
+  process.env.EMAIL_FROM ||
+  process.env.SMTP_FROM ||
+  `"BloodLink" <${process.env.SMTP_USER || process.env.EMAIL_USER}>`;
+
+const sendEmail = async ({ to, subject, text, html }) => {
+  if (process.env.RESEND_API_KEY) {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: getEmailFrom(),
+        to: [to],
+        subject,
+        text,
+        html,
+      }),
+    });
+
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(`Email API failed (${response.status}): ${body.slice(0, 300)}`);
+    }
+
+    return response.json();
+  }
+
+  return transporter.sendMail({
+    from: getEmailFrom(),
+    to,
+    subject,
+    text,
+    html,
+  });
+};
 
 const getEmailErrorMessage = (err) => {
   if (err.code === "EAUTH") {
@@ -104,10 +144,7 @@ exports.sendOtp = async (req, res) => {
     };
 
     if (isEmailConfigured()) {
-      await transporter.sendMail({
-        from:
-          process.env.SMTP_FROM ||
-          `"BloodLink" <${process.env.SMTP_USER || process.env.EMAIL_USER}>`,
+      await sendEmail({
         to: email,
         subject: "BloodLink OTP",
         text: `Your BloodLink OTP is ${otp}. It expires in 5 minutes.`,
@@ -407,10 +444,7 @@ exports.forgotPassword = async (req, res) => {
     await user.save();
 
     if (isEmailConfigured()) {
-      await transporter.sendMail({
-        from:
-          process.env.SMTP_FROM ||
-          `"BloodLink" <${process.env.SMTP_USER || process.env.EMAIL_USER}>`,
+      await sendEmail({
         to: email,
         subject: "BloodLink password reset",
         text: `Your BloodLink reset code is ${token}. It expires in 10 minutes.`,
