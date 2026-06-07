@@ -1,7 +1,7 @@
-import { Link } from 'react-router-dom';
-import PublicLayout from '../shared/PublicLayout';
-import { BLOOD_GROUPS, COMPATIBILITY } from '../../utils/bloodGroups';
-import BloodGroupBadge from '../../components/common/BloodGroupBadge';
+import { Link } from "react-router-dom";
+import PublicLayout from "../shared/PublicLayout";
+import { BLOOD_GROUPS, COMPATIBILITY } from "../../utils/bloodGroups";
+import BloodGroupBadge from "../../components/common/BloodGroupBadge";
 
 const LandingPage = () => (
   <PublicLayout>
@@ -13,11 +13,16 @@ const LandingPage = () => (
             <span className="block text-[#C0392B]">Donate Blood.</span>
           </h1>
           <p className="mt-5 max-w-xl text-lg text-slate-600">
-            BloodLink helps donors and hospitals coordinate urgent blood needs with eligibility checks, alerts, inventory and rewards.
+            BloodLink helps donors and hospitals coordinate urgent blood needs
+            with eligibility checks, alerts, inventory and rewards.
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
-            <Link className="btn-primary" to="/register">Register as Donor</Link>
-            <Link className="btn-outline" to="/register?role=hospital">Request Blood</Link>
+            <Link className="btn-primary" to="/register">
+              Register as Donor
+            </Link>
+            <Link className="btn-outline" to="/login">
+              Login
+            </Link>
           </div>
         </div>
         <div className="relative mx-auto h-80 w-64">
@@ -33,20 +38,27 @@ const LandingPage = () => (
 
     <section className="border-y border-slate-200 bg-[#1A2340] py-6 text-white">
       <div className="mx-auto grid max-w-7xl grid-cols-3 gap-4 px-4 text-center">
-        {['10,000+ Donors', '500+ Hospitals', '50,000+ Lives Saved'].map((item) => (
-          <div key={item} className="text-lg font-black md:text-3xl">{item}</div>
-        ))}
+        {["10,000+ Donors", "500+ Hospitals", "50,000+ Lives Saved"].map(
+          (item) => (
+            <div key={item} className="text-lg font-black md:text-3xl">
+              {item}
+            </div>
+          ),
+        )}
       </div>
     </section>
 
     <section className="mx-auto max-w-7xl px-4 py-12">
       <h2 className="mb-6 text-2xl font-black">How It Works</h2>
       <div className="page-grid">
-        {['Register', 'Get Matched', 'Donate'].map((step, index) => (
+        {["Register", "Get Matched", "Donate"].map((step, index) => (
           <div className="card" key={step}>
-            <div className="mb-3 text-3xl">{['📝', '📍', '🩸'][index]}</div>
+            <div className="mb-3 text-3xl">{["📝", "📍", "🩸"][index]}</div>
             <h3 className="text-lg font-black">{step}</h3>
-            <p className="mt-2 text-sm text-slate-500">A simple workflow built for quick response and clear status tracking.</p>
+            <p className="mt-2 text-sm text-slate-500">
+              A simple workflow built for quick response and clear status
+              tracking.
+            </p>
           </div>
         ))}
       </div>
@@ -60,7 +72,13 @@ const LandingPage = () => (
             <BloodGroupBadge group={group} />
             <p className="mt-3 text-sm text-slate-500">Can receive from</p>
             <div className="mt-2 flex flex-wrap gap-2">
-              {COMPATIBILITY[group].map((compatible) => <BloodGroupBadge key={compatible} group={compatible} size="sm" />)}
+              {COMPATIBILITY[group].map((compatible) => (
+                <BloodGroupBadge
+                  key={compatible}
+                  group={compatible}
+                  size="sm"
+                />
+              ))}
             </div>
           </div>
         ))}

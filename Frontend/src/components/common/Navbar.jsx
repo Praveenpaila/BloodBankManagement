@@ -13,8 +13,8 @@ const publicLinks = [
 ];
 
 const roleLinks = {
-  donor: [['Dashboard', '/donor/dashboard'], ['Requests', '/donor/nearby-requests'], ['SOS', '/donor/sos']],
-  hospital: [['Dashboard', '/hospital/dashboard'], ['Inventory', '/hospital/inventory']],
+  donor: [['Dashboard', '/donor/dashboard'], ['Requests', '/donor/nearby-requests'], ['Find Blood', '/donor/blood-finder'], ['SOS', '/donor/sos']],
+  hospital: [['Dashboard', '/hospital/dashboard'], ['Inventory', '/hospital/inventory'], ['Find Blood', '/hospital/blood-finder']],
   admin: [['Dashboard', '/admin/dashboard'], ['Users', '/admin/users']],
 };
 
@@ -121,7 +121,10 @@ const Navbar = () => {
             {isAuthenticated ? (
               <button className="btn-outline" onClick={logout}>Logout</button>
             ) : (
-              <Link className="btn-primary" to="/register">Register</Link>
+              <>
+                <Link className="btn-outline" to="/login" onClick={() => setOpen(false)}>Login</Link>
+                <Link className="btn-primary" to="/register" onClick={() => setOpen(false)}>Register</Link>
+              </>
             )}
           </div>
         </div>

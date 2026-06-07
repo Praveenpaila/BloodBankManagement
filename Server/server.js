@@ -12,7 +12,7 @@ const { initRealtime } = require("./utils/realtime");
 
 const app = express();
 app.set("trust proxy", 1);
-const port = process.env.PORT || 5000;
+const port = process.env.PORT || 3000;
 const server = http.createServer(app);
 initRealtime(server);
 
@@ -42,6 +42,7 @@ app.use("/api/loyalty", require("./routes/loyaltyRoutes"));
 app.use("/api/donations", require("./routes/donationRoutes"));
 app.use("/api/admin", require("./routes/adminRoutes"));
 app.use("/api/inventory", require("./routes/inventoryRoutes"));
+app.use("/api/blood-finder", require("./routes/bloodFinderRoutes"));
 app.use("/api/blood-requests", require("./routes/bloodRequestRoutes"));
 app.use("/api/notifications", require("./routes/notificationRoutes"));
 app.use("/api/donors", require("./routes/donorRoutes"));

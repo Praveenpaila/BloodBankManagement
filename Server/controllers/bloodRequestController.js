@@ -7,6 +7,7 @@ const { transporter } = require("./auth");
 const { emitToUser } = require("../utils/realtime");
 const { recordCompletedDonation } = require("../utils/recordDonation");
 const { rankDonorsByShortestPath } = require("../utils/geoRouting");
+const { haversineKm, roundKm } = require("../utils/haversine");
 const { bloodGroupFilterFor, compatibleDonorGroupsFor } = require("../utils/bloodCompatibility");
 
 const getDistanceInfo = async (origin, destinations) => {
@@ -118,11 +119,13 @@ exports.createRequest = async (req, res) => {
     const rankedDonors = rankDonorsByShortestPath(coordinates, donors, distances);
 
     const notifications = await Notification.insertMany(
-      rankedDonors.map(({ donor, routing }, index) => ({
+      rankedDonors.map(({ donor, routing }, index) => {
+        const distanceKm = roundKm(haversineKm(coordinates, donor.location.coordinates));
+        return {
         recipient: donor._id,
         type: "blood_request",
         title: `${urgency === "critical" ? "SOS: " : ""}${bloodGroup} blood needed`,
-        message: `${req.user.firstName} needs ${requestedUnits} unit(s). Distance: ${routing.distance}`,
+        message: `${req.user.firstName} needs ${requestedUnits} unit(s). Distance: ${distanceKm} km`,
         data: {
           requestId: request._id,
           urgency,
@@ -130,11 +133,12 @@ exports.createRequest = async (req, res) => {
           compatibleBloodGroups: compatibleDonorGroupsFor(bloodGroup),
           distance: routing.distance,
           duration: routing.duration,
-          distanceKm: routing.distanceKm,
+          distanceKm,
           rank: index + 1,
           routingAlgorithm: routing.algorithm,
         },
-      })),
+        };
+      }),
     );
 
     notifications.forEach((notification) => {
@@ -521,6 +525,7 @@ exports.getNearbyRequests = async (req, res) => {
       });
     }
 
+    const origin = [lng, lat];
     const requests = await BloodRequest.find({
       status: { $in: ["open", "responding"] },
       location: {
@@ -535,10 +540,18 @@ exports.getNearbyRequests = async (req, res) => {
     })
       .populate("requestedBy", "firstName lastName city")
       .sort({ createdAt: -1 });
+    const withDistance = requests
+      .map((request) => {
+        const data = request.toObject();
+        data.distanceKm = roundKm(haversineKm(origin, data.location?.coordinates));
+        return data;
+      })
+      .filter((request) => Number.isFinite(request.distanceKm))
+      .sort((a, b) => a.distanceKm - b.distanceKm);
 
     return res.status(200).json({
       success: true,
-      data: requests,
+      data: withDistance,
     });
   } catch (err) {
     return res.status(500).json({

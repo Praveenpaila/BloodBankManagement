@@ -10,6 +10,7 @@ import RegisterPage from './pages/auth/RegisterPage';
 import {
   AdminDashboard,
   BadgesPage,
+  BloodFinder,
   BloodInventory,
   BookAppointment,
   BroadcastAlerts,
@@ -70,6 +71,7 @@ function App() {
       <Route path="/donor/badges" element={<Protected role="donor"><BadgesPage /></Protected>} />
       <Route path="/donor/notifications" element={<Protected role="donor"><NotificationsPage /></Protected>} />
       <Route path="/donor/nearby-requests" element={<Protected role="donor"><NearbyRequestsPage /></Protected>} />
+      <Route path="/donor/blood-finder" element={<Protected role="donor"><BloodFinder /></Protected>} />
       <Route path="/donor/sos" element={<Protected role="donor"><RaiseRequest /></Protected>} />
       <Route path="/donor/chat/:requestId" element={<Protected role="donor"><ChatPage /></Protected>} />
 
@@ -79,6 +81,7 @@ function App() {
       <Route path="/hospital/raise-request" element={<Protected role="hospital"><RaiseRequest /></Protected>} />
       <Route path="/hospital/requests" element={<Protected role="hospital"><RequestStatus /></Protected>} />
       <Route path="/hospital/donor-search" element={<Protected role="hospital"><DonorSearch /></Protected>} />
+      <Route path="/hospital/blood-finder" element={<Protected role="hospital"><BloodFinder /></Protected>} />
       <Route path="/hospital/expiry-alerts" element={<Protected role="hospital"><ExpiryAlerts /></Protected>} />
       <Route path="/hospital/appointments" element={<Protected role="hospital"><HospitalAppointments /></Protected>} />
       <Route path="/hospital/profile" element={<Protected role="hospital"><HospitalProfile /></Protected>} />

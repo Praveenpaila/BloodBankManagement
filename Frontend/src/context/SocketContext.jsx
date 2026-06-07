@@ -8,10 +8,10 @@ import { useAuth } from './authStore';
 
 const SocketContext = createContext(null);
 
-const socketUrl = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace(/\/api\/?$/, '');
+const socketUrl = (import.meta.env.VITE_API_URL || 'http://localhost:3000/api').replace(/\/api\/?$/, '');
 
 export const SocketProvider = ({ children }) => {
-  const { token, isAuthenticated, user } = useAuth();
+  const { token, isAuthenticated, user, updateUser } = useAuth();
   const navigate = useNavigate();
   const [activeSos, setActiveSos] = useState(null);
   const alarmTimer = useRef(null);
@@ -82,6 +82,39 @@ export const SocketProvider = ({ children }) => {
   };
 
   useEffect(() => {
+    if (!isAuthenticated || user?.role !== 'donor') return undefined;
+    if (!navigator.geolocation) return undefined;
+
+    let cancelled = false;
+    const updateDonorLocation = () => {
+      navigator.geolocation.getCurrentPosition(
+        async ({ coords }) => {
+          if (cancelled) return;
+          try {
+            const { data } = await api.put('/donors/location', {
+              lat: coords.latitude,
+              lng: coords.longitude,
+            });
+            if (!cancelled) updateUser(data.data);
+          } catch {
+            // Keep the hourly location sync silent; manual screens still show errors.
+          }
+        },
+        () => {},
+        { enableHighAccuracy: true, maximumAge: 300000, timeout: 10000 },
+      );
+    };
+
+    updateDonorLocation();
+    const interval = window.setInterval(updateDonorLocation, 60 * 60 * 1000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [isAuthenticated, user?.role, updateUser]);
+
+  useEffect(() => {
     if (!socket) return undefined;
 
     socket.on('blood-request:new', (notification) => {
@@ -98,6 +131,9 @@ export const SocketProvider = ({ children }) => {
             <p className="alert-toast__eyebrow">Blood request nearby</p>
             <p className="alert-toast__title">{notification.title}</p>
             <p className="alert-toast__message">{notification.message}</p>
+            {Number.isFinite(Number(notification.data?.distanceKm)) && (
+              <p className="alert-toast__message">📍 {Number(notification.data.distanceKm).toFixed(1)} km from your location</p>
+            )}
           </div>
         </div>
       ), { duration: 10000 });
@@ -182,6 +218,9 @@ export const SocketProvider = ({ children }) => {
             <p className="sos-alarm__eyebrow">Emergency SOS nearby</p>
             <h2 id="sos-alarm-title">{activeSos.title}</h2>
             <p>{activeSos.message}</p>
+            {Number.isFinite(Number(activeSos.data?.distanceKm)) && (
+              <p className="font-bold">📍 {Number(activeSos.data.distanceKm).toFixed(1)} km from your location</p>
+            )}
             <div className="sos-alarm__meta">
               <span>{activeSos.data?.bloodGroup}</span>
               <span>{activeSos.data?.distance || 'Distance pending'}</span>

@@ -11,6 +11,7 @@ const sidebarItems = {
     ['Badges & Points', 'Award', '/donor/badges'],
     ['Notifications', 'Bell', '/donor/notifications'],
     ['Nearby Requests', 'Map', '/donor/nearby-requests'],
+    ['Find Blood', 'Find', '/donor/blood-finder'],
     ['Emergency SOS', 'SOS', '/donor/sos'],
   ],
   hospital: [
@@ -20,6 +21,7 @@ const sidebarItems = {
     ['Request Status', 'List', '/hospital/requests'],
     ['Appointments', 'Date', '/hospital/appointments'],
     ['Donor Search', 'Find', '/hospital/donor-search'],
+    ['Find Blood', 'Map', '/hospital/blood-finder'],
     ['Expiry Alerts', 'Clock', '/hospital/expiry-alerts'],
     ['Profile', 'Care', '/hospital/profile'],
     ['Notifications', 'Bell', '/hospital/notifications'],

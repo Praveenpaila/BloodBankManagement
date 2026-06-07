@@ -25,6 +25,12 @@ import { useSocket } from '../context/SocketContext';
 import { BLOOD_GROUPS } from '../utils/bloodGroups';
 
 const fmtDate = (value) => (value ? format(new Date(value), 'dd MMM yyyy') : 'N/A');
+const mapsUrl = (location) => {
+  const [lng, lat] = location?.coordinates || [];
+  return Number.isFinite(Number(lat)) && Number.isFinite(Number(lng))
+    ? `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`
+    : '#';
+};
 const urgencyClass = (value) =>
   value === 'critical'
     ? 'bg-red-50 text-red-700'
@@ -595,6 +601,7 @@ const NotificationsView = ({ title }) => {
         <div key={item._id || `${item.type || 'notification'}-${index}`} className={`card ${!item.isRead ? 'bg-red-50' : ''}`}>
           <div className="flex flex-wrap justify-between gap-2"><h3 className="font-black">{item.title}</h3><span className="text-sm text-slate-500">{formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}</span></div>
           <p className="mt-1 text-sm text-slate-600">{item.message}</p>
+          {item.type === 'blood_request' && Number.isFinite(Number(item.data?.distanceKm)) && <p className="mt-2 text-sm font-bold text-slate-600">📍 {Number(item.data.distanceKm).toFixed(1)} km away</p>}
           {item.type === 'blood_request' && !item.data?.closed && !item.data?.response && <div className="mt-3 flex gap-2"><button className="btn-primary" onClick={() => respond(item.data?.requestId, 'accept')}>Accept</button><button className="btn-outline" onClick={() => respond(item.data?.requestId, 'decline')}>Decline</button></div>}
           {item.type === 'blood_request' && item.data?.response && <p className="mt-3 text-sm font-bold text-slate-500">You {item.data.response}ed this request</p>}
           {item.type === 'blood_request' && item.data?.closed && <p className="mt-3 text-sm font-bold text-slate-500">Covered by {item.data?.acceptedDonorName || 'another donor'}</p>}
@@ -653,7 +660,7 @@ export const NearbyRequestsPage = () => {
       {!coords?.length ? <div className="card"><p className="font-black">Enable your location to see nearby requests.</p><button className="btn-primary mt-4" onClick={enable}>Update Location</button></div> : (
         <div className="grid gap-5 lg:grid-cols-[3fr_2fr]">
           <div className="card min-h-96">{import.meta.env.VITE_GOOGLE_MAPS_API_KEY ? 'Map view is ready for configured Google Maps key.' : 'Google Maps API key is not set. Nearby requests are listed on the right.'}</div>
-          <div className="space-y-3">{(data || []).filter(Boolean).map((item, index) => <RequestCard key={item._id || `request-${index}`} request={item} onAccept={item.status === 'open' ? () => acceptRequest(item._id) : undefined} />)}{(!data || data.length === 0) && <Empty text="No blood requests near you right now. You'll be notified when someone needs help." />}</div>
+          <div className="space-y-3">{(data || []).filter(Boolean).sort((a, b) => Number(a.distanceKm ?? Infinity) - Number(b.distanceKm ?? Infinity)).map((item, index) => <RequestCard key={item._id || `request-${index}`} request={item} onAccept={item.status === 'open' ? () => acceptRequest(item._id) : undefined} />)}{(!data || data.length === 0) && <Empty text="No blood requests near you right now. You'll be notified when someone needs help." />}</div>
         </div>
       )}
     </DashboardLayout>
@@ -665,7 +672,115 @@ const RequestCard = ({ request, onAccept }) => (
     <div className="flex items-center justify-between"><BloodGroupBadge group={request.bloodGroup} /><span className={`badge-pill ${urgencyClass(request.urgency)}`}>{request.urgency}</span></div>
     <p className="mt-3 font-bold">{request.requestedBy?.firstName || 'Hospital'}</p>
     <p className="text-sm text-slate-500">{request.unitsNeeded} unit(s), {formatDistanceToNow(new Date(request.createdAt), { addSuffix: true })}</p>
+    {Number.isFinite(Number(request.distanceKm)) && <p className="mt-2 text-sm font-bold text-slate-600">📍 {Number(request.distanceKm).toFixed(1)} km from you</p>}
     {onAccept && <button className="btn-primary mt-3" type="button" onClick={onAccept}>Accept Request</button>}
+  </div>
+);
+
+export const BloodFinder = () => {
+  const { user } = useAuth();
+  const [filters, setFilters] = useState({ bloodGroup: 'O+' });
+  const [coords, setCoords] = useState(null);
+  const [results, setResults] = useState({ hospitals: [], donors: [] });
+  const [loading, setLoading] = useState(false);
+
+  const search = async (nextCoords = coords) => {
+    setLoading(true);
+    try {
+      const { data } = await api.get('/blood-finder', {
+        params: {
+          bloodGroup: filters.bloodGroup,
+          lat: nextCoords?.lat,
+          lng: nextCoords?.lng,
+        },
+      });
+      setResults(data.data);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Unable to find blood nearby');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const savedCoords = user?.location?.coordinates?.length >= 2
+      ? { lat: user.location.coordinates[1], lng: user.location.coordinates[0] }
+      : null;
+
+    search(savedCoords);
+
+    if (!navigator.geolocation) {
+      if (savedCoords) {
+        setCoords(savedCoords);
+      }
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      ({ coords: c }) => {
+        const nextCoords = { lat: c.latitude, lng: c.longitude };
+        setCoords(nextCoords);
+      },
+      () => {
+        if (savedCoords) {
+          setCoords(savedCoords);
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000 },
+    );
+    // Initial location lookup should run once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <DashboardLayout title="Find Blood" subtitle="Search stock and eligible donors by blood group.">
+      <div className="card mb-5 grid gap-3 md:grid-cols-[1fr_auto]">
+        <Field label="Blood group">
+          <select className="input-field" value={filters.bloodGroup} onChange={(e) => setFilters({ ...filters, bloodGroup: e.target.value })}>
+            {BLOOD_GROUPS.map((group) => <option key={group}>{group}</option>)}
+          </select>
+        </Field>
+        <button className="btn-primary self-end" type="button" disabled={loading} onClick={() => search()}>
+          {loading ? 'Searching...' : 'Search'}
+        </button>
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-2">
+        <ResultColumn title="Hospitals & Blood Banks" empty="No stock found for this blood group.">
+          {(results.hospitals || []).map((item) => <BloodFinderCard key={item._id} item={item} showUnits />)}
+        </ResultColumn>
+        <ResultColumn title="Eligible Donors" empty="No eligible donors found for this blood group.">
+          {(results.donors || []).map((item) => <BloodFinderCard key={item._id} item={item} />)}
+        </ResultColumn>
+      </div>
+    </DashboardLayout>
+  );
+};
+
+const ResultColumn = ({ title, empty, children }) => (
+  <section>
+    <h2 className="mb-3 text-lg font-black">{title}</h2>
+    <div className="space-y-3">{children?.length ? children : <Empty text={empty} />}</div>
+  </section>
+);
+
+const BloodFinderCard = ({ item, showUnits = false }) => (
+  <div className="card">
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <h3 className="font-black">{item.name}</h3>
+        <div className="mt-2"><BloodGroupBadge group={item.bloodGroup} size="sm" /></div>
+        {showUnits && <p className="mt-2 text-sm font-bold text-green-700">{item.units} unit(s) available</p>}
+        {item.phoneNumber && <p className="mt-2 text-sm text-slate-600">Phone: {item.phoneNumber}</p>}
+        {item.address && <p className="mt-1 text-sm text-slate-600">Address: {item.address}</p>}
+        {item.city && <p className="text-sm text-slate-500">{item.city}</p>}
+        {item.lastAddressUpdated && <p className="mt-1 text-xs font-bold text-slate-500">Last address updated: {fmtDate(item.lastAddressUpdated)}</p>}
+      </div>
+    </div>
+    <div className="mt-4 flex flex-wrap gap-2">
+      {item.phoneNumber && <a className="btn-outline" href={`tel:${item.phoneNumber}`}>Call</a>}
+      {item.location?.coordinates?.length >= 2 && <a className="btn-primary" href={mapsUrl(item.location)} target="_blank" rel="noreferrer">Get Directions</a>}
+    </div>
   </div>
 );
 
@@ -760,8 +875,38 @@ export const RaiseRequest = () => {
     );
   };
 
+  const getLiveLocation = () => new Promise((resolve) => {
+    if (!navigator.geolocation) {
+      resolve(null);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      ({ coords: c }) => resolve({ lat: c.latitude, lng: c.longitude }),
+      () => resolve(null),
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 },
+    );
+  });
+
   const submit = async () => {
-    if (!hasLocation) {
+    const savedLocation = hasLocation ? { lat: coords[1], lng: coords[0] } : null;
+    setRequestingLocation(true);
+
+    const liveLocation = await getLiveLocation();
+    let requestLocation = liveLocation || savedLocation;
+
+    if (liveLocation) {
+      try {
+        const { data } = await api.put('/donors/location', liveLocation);
+        updateUser(data.data);
+      } catch (err) {
+        toast.error(err.response?.data?.message || 'Location update failed');
+      }
+    }
+
+    setRequestingLocation(false);
+
+    if (!requestLocation) {
       toast.error('Update your location before raising SOS');
       return;
     }
@@ -771,8 +916,8 @@ export const RaiseRequest = () => {
         ...form,
         unitsNeeded: Number(form.unitsNeeded),
         radiusKm: Number(form.radiusKm),
-        lat: coords[1],
-        lng: coords[0],
+        lat: requestLocation.lat,
+        lng: requestLocation.lng,
       });
       toast.success(`SOS sent to ${data.data.notifiedDonors} donors by ${data.data.matchingAlgorithm}`);
       setActiveRequest(data.data.request);
@@ -840,7 +985,7 @@ export const RaiseRequest = () => {
               {count === 0 && Number(form.radiusKm) >= 50 && <p className="mt-1 text-sm text-red-700">No eligible donors found at max radius. Contact hospitals directly.</p>}
             </div>
             <div className="flex flex-wrap gap-2">
-              <button className="btn-primary" onClick={submit} disabled={!hasLocation}>{isDonorSos ? 'Raise Emergency SOS' : 'Request Blood'}</button>
+              <button className="btn-primary" onClick={submit} disabled={requestingLocation}>{requestingLocation ? 'Updating Location...' : isDonorSos ? 'Raise Emergency SOS' : 'Request Blood'}</button>
               {isDonorSos && activeRequest?.status === 'open' && <button className="btn-outline" type="button" onClick={cancelRequest}>Cancel Request</button>}
             </div>
           </div>
