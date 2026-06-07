@@ -36,10 +36,17 @@ const isEmailConfigured = () =>
 
 const canExposeDevCode = () => process.env.NODE_ENV === "development";
 
-const getEmailFrom = () =>
-  process.env.EMAIL_FROM ||
-  process.env.SMTP_FROM ||
-  `"BloodLink" <${process.env.SMTP_USER || process.env.EMAIL_USER}>`;
+const getEmailFrom = () => {
+  if (process.env.RESEND_API_KEY) {
+    return process.env.EMAIL_FROM || process.env.RESEND_FROM || "BloodLink <onboarding@resend.dev>";
+  }
+
+  return (
+    process.env.EMAIL_FROM ||
+    process.env.SMTP_FROM ||
+    `"BloodLink" <${process.env.SMTP_USER || process.env.EMAIL_USER}>`
+  );
+};
 
 const sendEmail = async ({ to, subject, text, html }) => {
   if (process.env.RESEND_API_KEY) {
