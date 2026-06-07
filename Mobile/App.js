@@ -22,6 +22,7 @@ const API_BASE =
   process.env.EXPO_PUBLIC_API_URL ||
   (Platform.OS === "android" ? "http://10.0.2.2:3000/api" : "http://localhost:3000/api");
 const SOCKET_URL = API_BASE.replace(/\/api\/?$/, "");
+const SOS_ALERT_DURATION_MS = 60 * 1000;
 
 const empty = {
   donorStats: { totalDonations: 0, points: 0, badges: [] },
@@ -47,6 +48,7 @@ function App() {
   const [eligibilityTick, setEligibilityTick] = useState(0);
   const [donationTick, setDonationTick] = useState(0);
   const socketRef = useRef(null);
+  const sosAlertTimer = useRef(null);
 
   const api = useCallback(
     async (path, options = {}) => {
@@ -111,13 +113,27 @@ function App() {
     if (!token) return undefined;
     const socket = io(SOCKET_URL, { auth: { token }, transports: ["websocket", "polling"] });
     socketRef.current = socket;
+    const clearSosAlertTimer = () => {
+      if (sosAlertTimer.current) {
+        clearTimeout(sosAlertTimer.current);
+        sosAlertTimer.current = null;
+      }
+    };
     socket.on("blood-request:new", (notification) => {
       if (user?.role === "donor" && !notification?.data?.closed) {
+        clearSosAlertTimer();
         setActiveSos(notification);
+        sosAlertTimer.current = setTimeout(() => {
+          clearSosAlertTimer();
+          setActiveSos((current) => (
+            String(current?.data?.requestId) === String(notification?.data?.requestId) ? null : current
+          ));
+        }, SOS_ALERT_DURATION_MS);
       }
       Alert.alert("Blood request", notification?.message || "A nearby request needs help.");
     });
     socket.on("blood-request:closed", (payload = {}) => {
+      clearSosAlertTimer();
       setActiveSos((current) => (String(current?.data?.requestId) === String(payload.requestId) ? null : current));
       Alert.alert("Request covered", payload.message || "Another donor accepted this request.");
     });
@@ -143,7 +159,10 @@ function App() {
       Alert.alert("Eligibility updated", "You are deferred for 30 days after donation.");
       setEligibilityTick((tick) => tick + 1);
     });
-    return () => socket.disconnect();
+    return () => {
+      clearSosAlertTimer();
+      socket.disconnect();
+    };
   }, [token, user?.role]);
 
   const login = async (email, password) => {
@@ -184,6 +203,10 @@ function App() {
   const respondToSos = async (action) => {
     const requestId = activeSos?.data?.requestId;
     if (!requestId) return;
+    if (sosAlertTimer.current) {
+      clearTimeout(sosAlertTimer.current);
+      sosAlertTimer.current = null;
+    }
     try {
       const data = await api(`/blood-requests/${requestId}/respond`, { method: "PUT", body: { action } });
       setActiveSos(null);

@@ -17,6 +17,10 @@ const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || process.env.EMAIL_HOST,
   port: Number(process.env.SMTP_PORT || process.env.EMAIL_PORT || 587),
   secure: process.env.SMTP_SECURE === "true",
+  family: 4,
+  connectionTimeout: Number(process.env.SMTP_CONNECTION_TIMEOUT || 15000),
+  greetingTimeout: Number(process.env.SMTP_GREETING_TIMEOUT || 10000),
+  socketTimeout: Number(process.env.SMTP_SOCKET_TIMEOUT || 20000),
   auth: {
     user: process.env.SMTP_USER || process.env.EMAIL_USER,
     pass: process.env.SMTP_PASS || process.env.EMAIL_PASS,
@@ -30,6 +34,18 @@ const isEmailConfigured = () =>
   Boolean(process.env.SMTP_PASS || process.env.EMAIL_PASS);
 
 const canExposeDevCode = () => process.env.NODE_ENV === "development";
+
+const getEmailErrorMessage = (err) => {
+  if (err.code === "EAUTH") {
+    return "Email authentication failed. Check the SMTP username and app password.";
+  }
+
+  if (["ECONNECTION", "ETIMEDOUT", "ESOCKET", "ENETUNREACH"].includes(err.code)) {
+    return "Email service connection failed. Check SMTP_HOST, SMTP_PORT, SMTP_SECURE and whether the hosting provider can reach your SMTP server.";
+  }
+
+  return err.message || "Error sending email";
+};
 
 const normalizeContactData = ({ email, phoneNumber }) => ({
   email: email?.trim().toLowerCase(),
@@ -113,9 +129,7 @@ exports.sendOtp = async (req, res) => {
     console.error("OTP email error:", err);
     return res.status(500).json({
       success: false,
-      message: err.code === "EAUTH"
-        ? "Email authentication failed. Check the SMTP username and app password."
-        : err.message || "Error sending OTP",
+      message: getEmailErrorMessage(err),
     });
   }
 };
@@ -418,9 +432,7 @@ exports.forgotPassword = async (req, res) => {
     console.error("Password reset email error:", err);
     return res.status(500).json({
       success: false,
-      message: err.code === "EAUTH"
-        ? "Email authentication failed. Check the SMTP username and app password."
-        : err.message || "Error sending password reset code",
+      message: getEmailErrorMessage(err),
     });
   }
 };

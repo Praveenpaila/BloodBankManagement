@@ -9,12 +9,14 @@ import { useAuth } from './authStore';
 const SocketContext = createContext(null);
 
 const socketUrl = (import.meta.env.VITE_API_URL || 'http://localhost:3000/api').replace(/\/api\/?$/, '');
+const SOS_ALERT_DURATION_MS = 60 * 1000;
 
 export const SocketProvider = ({ children }) => {
   const { token, isAuthenticated, user, updateUser } = useAuth();
   const navigate = useNavigate();
   const [activeSos, setActiveSos] = useState(null);
   const alarmTimer = useRef(null);
+  const alarmStopTimer = useRef(null);
   const audioContext = useRef(null);
   const socket = useMemo(() => {
     if (!isAuthenticated || !token) return null;
@@ -28,6 +30,10 @@ export const SocketProvider = ({ children }) => {
     if (alarmTimer.current) {
       window.clearInterval(alarmTimer.current);
       alarmTimer.current = null;
+    }
+    if (alarmStopTimer.current) {
+      window.clearTimeout(alarmStopTimer.current);
+      alarmStopTimer.current = null;
     }
     navigator.vibrate?.(0);
   };
@@ -54,7 +60,7 @@ export const SocketProvider = ({ children }) => {
     }
   };
 
-  const startAlarm = () => {
+  const startAlarm = (notification) => {
     stopAlarm();
     playAlarmTick();
     navigator.vibrate?.([450, 180, 450, 500]);
@@ -62,6 +68,12 @@ export const SocketProvider = ({ children }) => {
       playAlarmTick();
       navigator.vibrate?.([450, 180, 450, 500]);
     }, 1800);
+    alarmStopTimer.current = window.setTimeout(() => {
+      stopAlarm();
+      setActiveSos((current) => (
+        String(current?.data?.requestId) === String(notification?.data?.requestId) ? null : current
+      ));
+    }, SOS_ALERT_DURATION_MS);
   };
 
   const respondToSos = async (action) => {
@@ -121,7 +133,7 @@ export const SocketProvider = ({ children }) => {
       if (!notification) return;
       if (user?.role === 'donor' && !notification.data?.closed) {
         setActiveSos(notification);
-        startAlarm();
+        startAlarm(notification);
       }
 
       toast.custom((t) => (
