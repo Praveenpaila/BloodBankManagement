@@ -65,6 +65,19 @@ const findNearbyDonors = async (bloodGroup, coordinates, radiusKm, excludeIds = 
   }).select("-password");
 };
 
+const escapeHtml = (value = "") =>
+  String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+
+const getDisplayName = (user) =>
+  user?.hospitalName ||
+  `${user?.firstName || ""} ${user?.lastName || ""}`.trim() ||
+  "BloodLink user";
+
 exports.createRequest = async (req, res) => {
   try {
     const { bloodGroup, unitsNeeded, urgency = "normal", lat, lng, radiusKm = 10, notes } =
@@ -145,16 +158,60 @@ exports.createRequest = async (req, res) => {
       if (notification?.recipient) emitToUser(notification.recipient, "blood-request:new", notification);
     });
 
-    for (const donor of donors) {
+    for (const { donor, routing } of rankedDonors) {
       if (donor.email && (process.env.EMAIL_USER || process.env.SMTP_USER)) {
+        const distanceKm = roundKm(haversineKm(coordinates, donor.location.coordinates));
+        const requesterName = getDisplayName(req.user);
+        const requesterType = req.user.role === "hospital" ? "Hospital/requester" : "Donor requester";
+        const locationText = `${coordinates[1]}, ${coordinates[0]}`;
+        const mapsLink = `https://www.google.com/maps/search/?api=1&query=${coordinates[1]},${coordinates[0]}`;
+        const notesText = notes?.trim() || "No extra notes provided.";
+
         transporter
           .sendMail({
             from:
               process.env.SMTP_FROM ||
               `"BloodLink" <${process.env.EMAIL_USER || process.env.SMTP_USER}>`,
             to: donor.email,
-            subject: "BloodLink Emergency Alert",
-            text: `${bloodGroup} blood is needed near you.`,
+            subject: `${urgency === "critical" ? "SOS: " : ""}${bloodGroup} blood needed - ${distanceKm} km away`,
+            text: [
+              `${bloodGroup} blood is needed through BloodLink.`,
+              "",
+              `Requester: ${requesterName}`,
+              `Requester type: ${requesterType}`,
+              `Phone: ${req.user.phoneNumber || "Not shared"}`,
+              `City: ${req.user.city || "Not shared"}`,
+              `Units needed: ${requestedUnits}`,
+              `Urgency: ${urgency}`,
+              `Distance: ${distanceKm} km`,
+              `Route estimate: ${routing.distance || "N/A"}${routing.duration ? `, ${routing.duration}` : ""}`,
+              `Request location: ${locationText}`,
+              `Map: ${mapsLink}`,
+              `Notes: ${notesText}`,
+              "",
+              "Open BloodLink to accept or decline this request.",
+            ].join("\n"),
+            html: `
+              <div style="font-family:Arial,sans-serif;line-height:1.5;color:#1f2937">
+                <h2 style="color:#c0392b;margin-bottom:8px">${escapeHtml(bloodGroup)} blood needed</h2>
+                <p>A BloodLink requester near you needs help.</p>
+                <table cellpadding="6" cellspacing="0" style="border-collapse:collapse">
+                  <tr><td><strong>Requester</strong></td><td>${escapeHtml(requesterName)}</td></tr>
+                  <tr><td><strong>Requester type</strong></td><td>${escapeHtml(requesterType)}</td></tr>
+                  <tr><td><strong>Phone</strong></td><td>${escapeHtml(req.user.phoneNumber || "Not shared")}</td></tr>
+                  <tr><td><strong>City</strong></td><td>${escapeHtml(req.user.city || "Not shared")}</td></tr>
+                  <tr><td><strong>Blood group</strong></td><td>${escapeHtml(bloodGroup)}</td></tr>
+                  <tr><td><strong>Units needed</strong></td><td>${requestedUnits}</td></tr>
+                  <tr><td><strong>Urgency</strong></td><td>${escapeHtml(urgency)}</td></tr>
+                  <tr><td><strong>Distance</strong></td><td>${distanceKm} km</td></tr>
+                  <tr><td><strong>Route estimate</strong></td><td>${escapeHtml(routing.distance || "N/A")}${routing.duration ? `, ${escapeHtml(routing.duration)}` : ""}</td></tr>
+                  <tr><td><strong>Location</strong></td><td>${escapeHtml(locationText)}</td></tr>
+                  <tr><td><strong>Notes</strong></td><td>${escapeHtml(notesText)}</td></tr>
+                </table>
+                <p><a href="${mapsLink}" style="color:#c0392b">View request location on map</a></p>
+                <p>Please open BloodLink to accept or decline this request.</p>
+              </div>
+            `,
           })
           .catch(() => {});
       }

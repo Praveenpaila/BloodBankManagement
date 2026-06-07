@@ -471,6 +471,81 @@ export const BookAppointment = () => {
   );
 };
 
+const pdfEscape = (value) =>
+  String(value ?? '')
+    .replace(/\\/g, '\\\\')
+    .replace(/\(/g, '\\(')
+    .replace(/\)/g, '\\)')
+    .replace(/[\r\n]+/g, ' ');
+
+const downloadPdf = (filename, content) => {
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>',
+    `<< /Length ${content.length} >>\nstream\n${content}\nendstream`,
+  ];
+  let pdf = '%PDF-1.4\n';
+  const offsets = [0];
+  objects.forEach((object, index) => {
+    offsets.push(pdf.length);
+    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  });
+  const xrefAt = pdf.length;
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  offsets.slice(1).forEach((offset) => {
+    pdf += `${String(offset).padStart(10, '0')} 00000 n \n`;
+  });
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefAt}\n%%EOF`;
+
+  const blob = new Blob([pdf], { type: 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+};
+
+const certificateLine = (x, y, label, value) =>
+  `BT /F2 13 Tf ${x} ${y} Td (${pdfEscape(label)}) Tj ET\nBT /F1 13 Tf ${x + 145} ${y} Td (${pdfEscape(value)}) Tj ET`;
+
+const generateCertificatePdf = (donation, user) => {
+  const donorName = `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'BloodLink donor';
+  const hospitalName = donation.hospital?.hospitalName || donation.hospital?.firstName || 'BloodLink partner';
+  const source = donation.source === 'sos' ? 'Emergency SOS response' : donation.source === 'appointment' ? 'Scheduled appointment' : 'Verified donation';
+  const lines = [
+    certificateLine(120, 300, 'Donor Name:', donorName),
+    certificateLine(120, 270, 'Blood Group:', donation.bloodGroup),
+    certificateLine(120, 240, 'Units Donated:', donation.units || 1),
+    certificateLine(120, 210, 'Donation Date:', fmtDate(donation.donationDate)),
+    certificateLine(120, 180, 'Recorded By:', hospitalName),
+    certificateLine(120, 150, 'Donation Type:', source),
+    certificateLine(120, 120, 'Certificate ID:', donation.certificateId),
+  ].join('\n');
+
+  const content = [
+    'q 1 1 1 rg 0 0 842 595 re f Q',
+    'q 0.75 0 0 0.75 105 65 cm 0.78 0.05 0.05 RG 4 w 0 0 900 640 re S Q',
+    'q 0.96 0.98 0.97 rg 84 60 674 475 re f Q',
+    'BT /F2 34 Tf 245 505 Td (Certificate of Blood Donation) Tj ET',
+    'BT /F1 15 Tf 272 475 Td (This certificate is proudly presented by BloodLink) Tj ET',
+    'BT /F1 14 Tf 175 350 Td (This certifies that the donor below completed a verified blood donation.) Tj ET',
+    lines,
+    'q 0.78 0.05 0.05 RG 3 w 596 106 140 82 re S Q',
+    'BT /F2 18 Tf 615 160 Td (BLOODLINK) Tj ET',
+    'BT /F2 15 Tf 625 135 Td (VERIFIED) Tj ET',
+    'BT /F1 10 Tf 598 116 Td (Official digital stamp) Tj ET',
+    'BT /F2 13 Tf 118 82 Td (Thank you for helping save lives.) Tj ET',
+  ].join('\n');
+
+  downloadPdf(`BloodLink-Certificate-${donation.certificateId || 'donation'}.pdf`, content);
+};
+
 export const DonationHistory = () => {
   const { user } = useAuth();
   const { socket } = useSocket();
@@ -501,7 +576,7 @@ export const DonationHistory = () => {
             </div>
           ) : (
             <PageTable headers={['Date', 'Hospital', 'Blood Group', 'Units', 'Type', 'Certificate']} rows={donations.map((item) => (
-              <tr key={item._id}><td>{fmtDate(item.donationDate)}</td><td>{item.hospital?.hospitalName || item.hospital?.firstName}</td><td><BloodGroupBadge group={item.bloodGroup} size="sm" /></td><td>{item.units}</td><td><span className={`badge-pill ${item.source === 'sos' ? 'bg-red-50 text-red-700' : item.source === 'appointment' ? 'bg-blue-50 text-blue-700' : 'bg-green-50 text-green-700'}`}>{item.source === 'sos' ? 'SOS' : item.source === 'appointment' ? 'Appointment' : 'Regular'}</span></td><td><button className="btn-outline" onClick={() => window.print()}>{item.certificateId}</button></td></tr>
+              <tr key={item._id}><td>{fmtDate(item.donationDate)}</td><td>{item.hospital?.hospitalName || item.hospital?.firstName}</td><td><BloodGroupBadge group={item.bloodGroup} size="sm" /></td><td>{item.units}</td><td><span className={`badge-pill ${item.source === 'sos' ? 'bg-red-50 text-red-700' : item.source === 'appointment' ? 'bg-blue-50 text-blue-700' : 'bg-green-50 text-green-700'}`}>{item.source === 'sos' ? 'SOS' : item.source === 'appointment' ? 'Appointment' : 'Regular'}</span></td><td><button className="btn-outline" type="button" onClick={() => generateCertificatePdf(item, user)}>Download PDF</button><p className="mt-1 text-xs text-slate-500">{item.certificateId}</p></td></tr>
             ))} />
           )}
           <div className="card print:block">

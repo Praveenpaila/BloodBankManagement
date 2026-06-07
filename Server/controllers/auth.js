@@ -14,14 +14,22 @@ const generateToken = (id, role) => {
 };
 
 const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST || process.env.SMTP_HOST,
-  port: Number(process.env.EMAIL_PORT || process.env.SMTP_PORT || 587),
+  host: process.env.SMTP_HOST || process.env.EMAIL_HOST,
+  port: Number(process.env.SMTP_PORT || process.env.EMAIL_PORT || 587),
   secure: process.env.SMTP_SECURE === "true",
   auth: {
-    user: process.env.EMAIL_USER || process.env.SMTP_USER,
-    pass: process.env.EMAIL_PASS || process.env.SMTP_PASS,
+    user: process.env.SMTP_USER || process.env.EMAIL_USER,
+    pass: process.env.SMTP_PASS || process.env.EMAIL_PASS,
   },
 });
+
+const isEmailConfigured = () =>
+  process.env.EMAIL_ENABLED !== "false" &&
+  Boolean(process.env.SMTP_HOST || process.env.EMAIL_HOST) &&
+  Boolean(process.env.SMTP_USER || process.env.EMAIL_USER) &&
+  Boolean(process.env.SMTP_PASS || process.env.EMAIL_PASS);
+
+const canExposeDevCode = () => process.env.NODE_ENV === "development";
 
 const normalizeContactData = ({ email, phoneNumber }) => ({
   email: email?.trim().toLowerCase(),
@@ -79,26 +87,35 @@ exports.sendOtp = async (req, res) => {
       expiresAt: Date.now() + 5 * 60 * 1000,
     };
 
-    if ((process.env.EMAIL_USER || process.env.SMTP_USER) && (process.env.EMAIL_PASS || process.env.SMTP_PASS)) {
+    if (isEmailConfigured()) {
       await transporter.sendMail({
         from:
           process.env.SMTP_FROM ||
-          `"BloodLink" <${process.env.EMAIL_USER || process.env.SMTP_USER}>`,
+          `"BloodLink" <${process.env.SMTP_USER || process.env.EMAIL_USER}>`,
         to: email,
         subject: "BloodLink OTP",
+        text: `Your BloodLink OTP is ${otp}. It expires in 5 minutes.`,
         html: `<div><h2>Your OTP is ${otp}</h2><p>OTP expires in 5 minutes</p></div>`,
+      });
+    } else if (!canExposeDevCode()) {
+      return res.status(500).json({
+        success: false,
+        message: "Email service is not configured. Add SMTP_HOST, SMTP_USER and EMAIL_PASS/SMTP_PASS.",
       });
     }
 
     return res.status(200).json({
       success: true,
       message: "OTP sent successfully",
-      data: process.env.NODE_ENV === "development" ? { otp } : undefined,
+      data: canExposeDevCode() ? { otp } : undefined,
     });
   } catch (err) {
+    console.error("OTP email error:", err);
     return res.status(500).json({
       success: false,
-      message: err.message || "Error sending OTP",
+      message: err.code === "EAUTH"
+        ? "Email authentication failed. Check the SMTP username and app password."
+        : err.message || "Error sending OTP",
     });
   }
 };
@@ -375,26 +392,35 @@ exports.forgotPassword = async (req, res) => {
     user.resetPasswordExpire = Date.now() + 10 * 60 * 1000;
     await user.save();
 
-    if ((process.env.EMAIL_USER || process.env.SMTP_USER) && (process.env.EMAIL_PASS || process.env.SMTP_PASS)) {
+    if (isEmailConfigured()) {
       await transporter.sendMail({
         from:
           process.env.SMTP_FROM ||
-          `"BloodLink" <${process.env.EMAIL_USER || process.env.SMTP_USER}>`,
+          `"BloodLink" <${process.env.SMTP_USER || process.env.EMAIL_USER}>`,
         to: email,
         subject: "BloodLink password reset",
+        text: `Your BloodLink reset code is ${token}. It expires in 10 minutes.`,
         html: `<div><h2>Your reset code is ${token}</h2><p>This code expires in 10 minutes.</p></div>`,
+      });
+    } else if (!canExposeDevCode()) {
+      return res.status(500).json({
+        success: false,
+        message: "Email service is not configured. Add SMTP_HOST, SMTP_USER and EMAIL_PASS/SMTP_PASS.",
       });
     }
 
     return res.status(200).json({
       success: true,
       message: "Password reset code sent",
-      data: process.env.NODE_ENV === "development" ? { token } : undefined,
+      data: canExposeDevCode() ? { token } : undefined,
     });
   } catch (err) {
+    console.error("Password reset email error:", err);
     return res.status(500).json({
       success: false,
-      message: err.message || "Error sending password reset code",
+      message: err.code === "EAUTH"
+        ? "Email authentication failed. Check the SMTP username and app password."
+        : err.message || "Error sending password reset code",
     });
   }
 };
