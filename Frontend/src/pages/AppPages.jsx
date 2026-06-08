@@ -4,6 +4,38 @@ import toast from 'react-hot-toast';
 import DatePicker from 'react-datepicker';
 import { format, formatDistanceToNow } from 'date-fns';
 import {
+  Award,
+  ArrowLeft,
+  ArrowRight,
+  Bell,
+  CalendarPlus,
+  CalendarDays,
+  CheckCircle,
+  Clock,
+  Download,
+  Droplet,
+  HeartPulse,
+  LocateFixed,
+  LogIn,
+  MapPin,
+  Megaphone,
+  Navigation,
+  MessageCircle,
+  Package,
+  Phone,
+  Plus,
+  Radio,
+  Save,
+  Search as SearchIcon,
+  Send,
+  ShieldCheck,
+  Stethoscope,
+  Trash2,
+  Users,
+  X,
+  XCircle,
+} from 'lucide-react';
+import {
   Bar,
   BarChart,
   CartesianGrid,
@@ -37,6 +69,18 @@ const urgencyClass = (value) =>
     : value === 'urgent'
       ? 'bg-amber-50 text-amber-700'
       : 'bg-green-50 text-green-700';
+const statusClasses = {
+  open: 'bg-yellow-50 text-yellow-700',
+  responding: 'bg-blue-50 text-blue-700',
+  fulfilled: 'bg-green-50 text-green-700',
+  completed: 'bg-green-50 text-green-700',
+  active: 'bg-green-50 text-green-700',
+  scheduled: 'bg-amber-50 text-amber-700',
+  pending: 'bg-amber-50 text-amber-700',
+  cancelled: 'bg-slate-100 text-slate-600',
+  suspended: 'bg-slate-100 text-slate-600',
+};
+const statusClass = (value) => statusClasses[value] || 'bg-slate-100 text-slate-600';
 
 const useApi = (loader, deps = []) => {
   const [data, setData] = useState(null);
@@ -60,18 +104,38 @@ const useApi = (loader, deps = []) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 
-  return { data, loading, reload };
+  return { data, loading, reload, setData };
 };
 
-const StatCard = ({ label, value, tone = 'slate' }) => (
-  <div className="card">
-    <p className="text-sm font-bold text-slate-500">{label}</p>
-    <p className={`mt-2 text-3xl font-black text-${tone}-700`}>{value ?? 0}</p>
-  </div>
-);
+const statIconFor = (label = '') => {
+  const normalized = label.toLowerCase();
+  if (normalized.includes('donor') || normalized.includes('user') || normalized.includes('hospital')) return Users;
+  if (normalized.includes('appointment') || normalized.includes('date') || normalized.includes('today')) return CalendarDays;
+  if (normalized.includes('badge') || normalized.includes('point') || normalized.includes('rank')) return Award;
+  if (normalized.includes('expiry') || normalized.includes('eligible')) return HeartPulse;
+  if (normalized.includes('unit') || normalized.includes('inventory') || normalized.includes('stock')) return Package;
+  return Droplet;
+};
 
-const Empty = ({ text = 'No records yet.' }) => (
-  <div className="card text-center text-sm font-bold text-slate-500">{text}</div>
+const StatCard = ({ label, value, tone = 'slate' }) => {
+  const Icon = statIconFor(label);
+  return (
+    <div className="card">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-bold text-slate-500">{label}</p>
+        <Icon className="text-[#C0392B]" size={20} />
+      </div>
+      <p className={`mt-2 text-3xl font-black text-${tone}-700`}>{value ?? 0}</p>
+    </div>
+  );
+};
+
+const Empty = ({ text = 'No records yet.', title = 'Nothing here yet' }) => (
+  <div className="empty-state">
+    <Droplet size={34} />
+    <h3>{title}</h3>
+    <p>{text}</p>
+  </div>
 );
 
 const PageTable = ({ headers, rows, empty = 'No records found.' }) => (
@@ -82,7 +146,7 @@ const PageTable = ({ headers, rows, empty = 'No records found.' }) => (
       </thead>
       <tbody>
         {rows.length === 0 ? (
-          <tr><td colSpan={headers.length} className="text-center text-slate-500">{empty}</td></tr>
+          <tr><td colSpan={headers.length}><Empty title="No records" text={empty} /></td></tr>
         ) : rows}
       </tbody>
     </table>
@@ -91,7 +155,7 @@ const PageTable = ({ headers, rows, empty = 'No records found.' }) => (
 
 const Field = ({ label, children }) => (
   <label className="block">
-    <span className="mb-1 block text-sm font-bold text-slate-700">{label}</span>
+    <span className="mb-1 flex items-center gap-1 text-sm font-bold text-slate-700"><Users size={15} /> {label}</span>
     {children}
   </label>
 );
@@ -147,18 +211,18 @@ export const ForgotPasswordPage = () => {
         {step === 'done' ? (
           <div className="mt-4">
             <p className="text-green-700">Your password has been reset.</p>
-            <Link className="btn-primary mt-4" to="/login">Back to Login</Link>
+            <Link className="btn-primary mt-4" to="/login"><LogIn size={16} /> Back to Login</Link>
           </div>
         ) : step === 'email' ? (
           <>
             <Field label="Email"><input className="input-field" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required /></Field>
-            <button className="btn-primary mt-5 w-full" disabled={loading}>{loading ? 'Sending...' : 'Send reset code'}</button>
+            <button className="btn-primary mt-5 w-full" disabled={loading}><Send size={16} /> {loading ? 'Sending...' : 'Send reset code'}</button>
           </>
         ) : (
           <>
             <Field label="Reset code"><input className="input-field" value={form.token} onChange={(e) => setForm({ ...form, token: e.target.value })} required /></Field>
             <Field label="New password"><input className="input-field" type="password" value={form.newPassword} onChange={(e) => setForm({ ...form, newPassword: e.target.value })} required minLength={6} /></Field>
-            <button className="btn-primary mt-5 w-full" disabled={loading}>{loading ? 'Resetting...' : 'Reset password'}</button>
+            <button className="btn-primary mt-5 w-full" disabled={loading}><Save size={16} /> {loading ? 'Resetting...' : 'Reset password'}</button>
           </>
         )}
       </form>
@@ -227,14 +291,14 @@ export const DonorDashboard = () => {
               <h3 className="text-lg font-black">Eligibility</h3>
               <p className="mt-2 capitalize">{status.replaceAll('_', ' ')}</p>
               {data.eligibility?.deferralReason && <p className="mt-1 text-sm">{data.eligibility.deferralReason}</p>}
-              <Link className="btn-primary mt-4" to="/donor/eligibility">Check Eligibility</Link>
+              <Link className="btn-primary mt-4" to="/donor/eligibility"><Stethoscope size={16} /> Check Eligibility</Link>
             </div>
             <div className="card">
               <h3 className="text-lg font-black">Quick Actions</h3>
               <div className="mt-4 flex flex-wrap gap-3">
-                <Link className="btn-outline" to="/donor/appointments">Book Appointment</Link>
-                <Link className="btn-outline" to="/donor/nearby-requests">View Map</Link>
-                <Link className="btn-primary" to="/donor/sos">Emergency SOS</Link>
+                <Link className="btn-outline" to="/donor/appointments"><CalendarPlus size={16} /> Book Appointment</Link>
+                <Link className="btn-outline" to="/donor/nearby-requests"><MapPin size={16} /> View Map</Link>
+                <Link className="btn-primary" to="/donor/sos"><Droplet size={16} /> Emergency SOS</Link>
               </div>
             </div>
           </div>
@@ -251,7 +315,7 @@ export const DonorDashboard = () => {
                     <p className="text-sm text-slate-500">{item.message}</p>
                   </div>
                 ))}
-                {data.notifications.length === 0 && <p className="text-sm text-slate-500">No alerts yet.</p>}
+                {data.notifications.length === 0 && <Empty title="No alerts" text="You're all caught up." />}
               </div>
             </div>
           </div>
@@ -296,8 +360,8 @@ export const DonorProfile = () => {
         ))}
         <Field label="Blood Group"><select className="input-field" value={form.bloodGroup} onChange={(e) => setForm({ ...form, bloodGroup: e.target.value })}>{BLOOD_GROUPS.map((group) => <option key={group}>{group}</option>)}</select></Field>
         <div className="flex items-end gap-3">
-          <button className="btn-primary">Save Profile</button>
-          <button type="button" className="btn-outline" onClick={updateLocation}>Update My Location</button>
+          <button className="btn-primary"><Save size={16} /> Save Profile</button>
+          <button type="button" className="btn-outline" onClick={updateLocation}><LocateFixed size={16} /> Update My Location</button>
         </div>
       </form>
       <div className="card mt-5">
@@ -370,8 +434,8 @@ export const EligibilityPage = () => {
         {step === 3 && <ToggleGrid items={['travelHistory', 'tattooPiercing']} form={form} update={update} />}
         {step === 4 && <div className="grid gap-4 md:grid-cols-2"><Field label="Hemoglobin"><input className="input-field input-field-lg" type="number" step="0.1" placeholder="e.g. 13.5" value={form.hemoglobin} onChange={(e) => update('hemoglobin', e.target.value)} /></Field><Field label="Gender"><select className="input-field input-field-lg" value={form.gender} onChange={(e) => update('gender', e.target.value)}><option value="male">Male</option><option value="female">Female</option><option value="other">Other</option></select></Field></div>}
         <div className="mt-6 flex justify-between">
-          <button className="btn-outline" disabled={step === 1} onClick={() => setStep(step - 1)}>Back</button>
-          {step < 4 ? <button className="btn-primary" onClick={() => setStep(step + 1)}>Next</button> : <button className="btn-primary" onClick={submit}>Submit</button>}
+          <button className="btn-outline" disabled={step === 1} onClick={() => setStep(step - 1)}><ArrowLeft size={16} /> Back</button>
+          {step < 4 ? <button className="btn-primary" onClick={() => setStep(step + 1)}>Next <ArrowRight size={16} /></button> : <button className="btn-primary" onClick={submit}><CheckCircle size={16} /> Submit</button>}
         </div>
       </div>
       {result && (
@@ -458,13 +522,13 @@ export const BookAppointment = () => {
             <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-green-800">
               <p className="font-black">Appointment confirmed</p>
               <p className="mt-1 text-sm">{confirmation.hospitalName} | {fmtDate(confirmation.date)} | {confirmation.timeSlot}</p>
-              <button type="button" className="btn-outline mt-3" onClick={addToCalendar}>Add to Calendar</button>
+              <button type="button" className="btn-outline mt-3" onClick={addToCalendar}><CalendarPlus size={16} /> Add to Calendar</button>
             </div>
           )}
           <Field label="Hospital"><select className="input-field" value={form.hospital} onChange={(e) => setForm({ ...form, hospital: e.target.value })}><option value="">Select hospital</option>{data?.hospitals?.map((item) => <option value={item._id} key={item._id}>{item.firstName}</option>)}</select></Field>
           <Field label="Date"><DatePicker className="input-field" minDate={new Date()} selected={form.date} onChange={(date) => setForm({ ...form, date })} /></Field>
           <div className="grid gap-3 md:grid-cols-3">{['Morning', 'Afternoon', 'Evening'].map((slot) => <button type="button" key={slot} className={form.timeSlot === slot ? 'btn-primary' : 'btn-outline'} onClick={() => setForm({ ...form, timeSlot: slot })}>{slot}</button>)}</div>
-          <button className="btn-primary" onClick={submit}>Confirm Appointment</button>
+          <button className="btn-primary" onClick={submit}><CalendarDays size={16} /> Confirm Appointment</button>
         </div>
       )}
     </DashboardLayout>
@@ -570,13 +634,15 @@ export const DonationHistory = () => {
         <div className="space-y-5">
           <div className="page-grid"><StatCard label="Total Donations" value={data.totalDonations} /><StatCard label="Lives Impacted" value={data.totalDonations * 3} /><StatCard label="Donation Streak" value={`${months.size} months`} /></div>
           {donations.length === 0 ? (
-            <div className="card text-center">
-              <p className="font-black">You haven't donated yet. Book your first appointment!</p>
-              <Link className="btn-primary mt-4" to="/donor/appointments">Book Appointment</Link>
+            <div className="empty-state">
+              <Droplet size={34} />
+              <h3>No donations yet</h3>
+              <p>Book your first appointment and start building your donation history.</p>
+              <Link className="btn-primary mt-4" to="/donor/appointments"><CalendarPlus size={16} /> Book Appointment</Link>
             </div>
           ) : (
             <PageTable headers={['Date', 'Hospital', 'Blood Group', 'Units', 'Type', 'Certificate']} rows={donations.map((item) => (
-              <tr key={item._id}><td>{fmtDate(item.donationDate)}</td><td>{item.hospital?.hospitalName || item.hospital?.firstName}</td><td><BloodGroupBadge group={item.bloodGroup} size="sm" /></td><td>{item.units}</td><td><span className={`badge-pill ${item.source === 'sos' ? 'bg-red-50 text-red-700' : item.source === 'appointment' ? 'bg-blue-50 text-blue-700' : 'bg-green-50 text-green-700'}`}>{item.source === 'sos' ? 'SOS' : item.source === 'appointment' ? 'Appointment' : 'Regular'}</span></td><td><button className="btn-outline" type="button" onClick={() => generateCertificatePdf(item, user)}>Download PDF</button><p className="mt-1 text-xs text-slate-500">{item.certificateId}</p></td></tr>
+              <tr key={item._id}><td>{fmtDate(item.donationDate)}</td><td>{item.hospital?.hospitalName || item.hospital?.firstName}</td><td><BloodGroupBadge group={item.bloodGroup} size="sm" /></td><td>{item.units}</td><td><span className={`badge-pill ${item.source === 'sos' ? 'bg-red-50 text-red-700' : item.source === 'appointment' ? 'bg-blue-50 text-blue-700' : 'bg-green-50 text-green-700'}`}>{item.source === 'sos' ? 'SOS' : item.source === 'appointment' ? 'Appointment' : 'Regular'}</span></td><td><button className="btn-outline" type="button" onClick={() => generateCertificatePdf(item, user)}><Download size={16} /> Download PDF</button><p className="mt-1 text-xs text-slate-500">{item.certificateId}</p></td></tr>
             ))} />
           )}
           <div className="card print:block">
@@ -630,18 +696,20 @@ const NotificationsView = ({ title }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { socket } = useSocket();
-  const { data, reload } = useApi(async () => (await api.get('/notifications')).data.data, []);
+  const { data, reload: fetchNotifications, setData } = useApi(async () => (await api.get('/notifications')).data.data, []);
 
   useEffect(() => {
     if (!socket) return undefined;
-    const refresh = () => reload();
+    const refresh = () => fetchNotifications();
     socket.on('blood-request:new', refresh);
     socket.on('blood-request:closed', refresh);
     socket.on('blood-request:response', refresh);
+    socket.on('chat:ready', refresh);
     return () => {
       socket.off('blood-request:new', refresh);
       socket.off('blood-request:closed', refresh);
       socket.off('blood-request:response', refresh);
+      socket.off('chat:ready', refresh);
     };
     // reload is provided by the local useApi helper and refreshed by this subscription.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -655,7 +723,7 @@ const NotificationsView = ({ title }) => {
       }
       const { data } = await api.put(`/blood-requests/${requestId}/respond`, { action });
       toast.success(`Request ${action}ed`);
-      reload();
+      fetchNotifications();
       if (action === 'accept') {
         const acceptedRequestId = data?.data?.request?._id || requestId;
         navigate(`/${user?.role || 'donor'}/chat/${acceptedRequestId}`);
@@ -667,22 +735,54 @@ const NotificationsView = ({ title }) => {
   const markAll = async () => {
     await api.put('/notifications/read-all');
     toast.success('All read');
-    reload();
+    fetchNotifications();
+  };
+  const markRead = async (id) => {
+    await api.put(`/notifications/${id}/read`);
+    setData((items = []) => items.map((item) => (item._id === id ? { ...item, isRead: true } : item)));
+    fetchNotifications();
+  };
+  const deleteNotification = async (id) => {
+    setData((items = []) => items.filter((item) => item._id !== id));
+    await api.delete(`/notifications/${id}`);
+    toast.success('Notification deleted');
+    fetchNotifications();
+  };
+  const clearAll = async () => {
+    setData([]);
+    await api.delete('/notifications/all');
+    toast.success('Notifications cleared');
+    fetchNotifications();
   };
   return (
     <DashboardLayout title={title}>
-      <button className="btn-outline mb-4" onClick={markAll}>Mark all read</button>
+      <div className="mb-4 flex flex-wrap gap-2">
+        <button className="btn-outline" onClick={markAll}><CheckCircle size={16} /> Mark all read</button>
+        <button className="btn-danger" onClick={clearAll}><Trash2 size={16} /> Clear All</button>
+      </div>
       <div className="space-y-3">{(data || []).filter(Boolean).map((item, index) => (
         <div key={item._id || `${item.type || 'notification'}-${index}`} className={`card ${!item.isRead ? 'bg-red-50' : ''}`}>
-          <div className="flex flex-wrap justify-between gap-2"><h3 className="font-black">{item.title}</h3><span className="text-sm text-slate-500">{formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}</span></div>
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="flex items-start gap-3">
+              {item.type === 'blood_request' ? <Droplet className="mt-1 text-[#C0392B]" size={18} /> : <Bell className="mt-1 text-slate-500" size={18} />}
+              <div>
+                <h3 className="font-black">{item.title}</h3>
+                <span className="text-sm text-slate-500">{formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}</span>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              {!item.isRead && item._id && <button className="icon-button" type="button" aria-label="Mark read" onClick={() => markRead(item._id)}><CheckCircle size={16} /></button>}
+              {item._id && <button className="icon-button danger" type="button" aria-label="Delete notification" onClick={() => deleteNotification(item._id)}><X size={16} /></button>}
+            </div>
+          </div>
           <p className="mt-1 text-sm text-slate-600">{item.message}</p>
-          {item.type === 'blood_request' && Number.isFinite(Number(item.data?.distanceKm)) && <p className="mt-2 text-sm font-bold text-slate-600">📍 {Number(item.data.distanceKm).toFixed(1)} km away</p>}
-          {item.type === 'blood_request' && !item.data?.closed && !item.data?.response && <div className="mt-3 flex gap-2"><button className="btn-primary" onClick={() => respond(item.data?.requestId, 'accept')}>Accept</button><button className="btn-outline" onClick={() => respond(item.data?.requestId, 'decline')}>Decline</button></div>}
+          {item.type === 'blood_request' && Number.isFinite(Number(item.data?.distanceKm)) && <p className="mt-2 flex items-center gap-1 text-sm font-bold text-slate-600"><MapPin size={16} /> {Number(item.data.distanceKm).toFixed(1)} km away</p>}
+          {item.type === 'blood_request' && !item.data?.closed && !item.data?.response && <div className="mt-3 flex gap-2"><button className="btn-primary" onClick={() => respond(item.data?.requestId, 'accept')}><CheckCircle size={16} /> Accept</button><button className="btn-outline" onClick={() => respond(item.data?.requestId, 'decline')}><XCircle size={16} /> Decline</button></div>}
           {item.type === 'blood_request' && item.data?.response && <p className="mt-3 text-sm font-bold text-slate-500">You {item.data.response}ed this request</p>}
           {item.type === 'blood_request' && item.data?.closed && <p className="mt-3 text-sm font-bold text-slate-500">Covered by {item.data?.acceptedDonorName || 'another donor'}</p>}
-          {item.type === 'donor_response' && item.data?.requestId && <button className="btn-outline mt-3" onClick={() => navigate(`/${user.role}/chat/${item.data.requestId}`)}>Open Chat</button>}
+          {item.type === 'donor_response' && item.data?.requestId && <button className="btn-outline mt-3" onClick={() => navigate(`/${user.role}/chat/${item.data.requestId}`)}><MessageCircle size={16} /> Open Chat</button>}
         </div>
-      ))}{(!data || data.length === 0) && <Empty text="You're all caught up. No new notifications." />}</div>
+      ))}{(!data || data.length === 0) && <Empty title="All caught up" text="No new notifications." />}</div>
     </DashboardLayout>
   );
 };
@@ -732,7 +832,7 @@ export const NearbyRequestsPage = () => {
 
   return (
     <DashboardLayout title="Nearby Requests">
-      {!coords?.length ? <div className="card"><p className="font-black">Enable your location to see nearby requests.</p><button className="btn-primary mt-4" onClick={enable}>Update Location</button></div> : (
+      {!coords?.length ? <div className="empty-state"><MapPin size={34} /><h3>Location needed</h3><p>Enable your location to see nearby blood requests.</p><button className="btn-primary mt-4" onClick={enable}><LocateFixed size={16} /> Update Location</button></div> : (
         <div className="grid gap-5 lg:grid-cols-[3fr_2fr]">
           <div className="card min-h-96">{import.meta.env.VITE_GOOGLE_MAPS_API_KEY ? 'Map view is ready for configured Google Maps key.' : 'Google Maps API key is not set. Nearby requests are listed on the right.'}</div>
           <div className="space-y-3">{(data || []).filter(Boolean).sort((a, b) => Number(a.distanceKm ?? Infinity) - Number(b.distanceKm ?? Infinity)).map((item, index) => <RequestCard key={item._id || `request-${index}`} request={item} onAccept={item.status === 'open' ? () => acceptRequest(item._id) : undefined} />)}{(!data || data.length === 0) && <Empty text="No blood requests near you right now. You'll be notified when someone needs help." />}</div>
@@ -746,9 +846,9 @@ const RequestCard = ({ request, onAccept }) => (
   <div className="card">
     <div className="flex items-center justify-between"><BloodGroupBadge group={request.bloodGroup} /><span className={`badge-pill ${urgencyClass(request.urgency)}`}>{request.urgency}</span></div>
     <p className="mt-3 font-bold">{request.requestedBy?.firstName || 'Hospital'}</p>
-    <p className="text-sm text-slate-500">{request.unitsNeeded} unit(s), {formatDistanceToNow(new Date(request.createdAt), { addSuffix: true })}</p>
-    {Number.isFinite(Number(request.distanceKm)) && <p className="mt-2 text-sm font-bold text-slate-600">📍 {Number(request.distanceKm).toFixed(1)} km from you</p>}
-    {onAccept && <button className="btn-primary mt-3" type="button" onClick={onAccept}>Accept Request</button>}
+    <p className="mt-1 flex items-center gap-1 text-sm text-slate-500"><Clock size={16} /> {request.unitsNeeded} unit(s), {formatDistanceToNow(new Date(request.createdAt), { addSuffix: true })}</p>
+    {Number.isFinite(Number(request.distanceKm)) && <p className="mt-2 flex items-center gap-1 text-sm font-bold text-slate-600"><MapPin size={16} /> {Number(request.distanceKm).toFixed(1)} km from you</p>}
+    {onAccept && <button className="btn-primary mt-3" type="button" onClick={onAccept}><CheckCircle size={16} /> Accept Request</button>}
   </div>
 );
 
@@ -816,6 +916,7 @@ export const BloodFinder = () => {
           </select>
         </Field>
         <button className="btn-primary self-end" type="button" disabled={loading} onClick={() => search()}>
+          <SearchIcon size={16} />
           {loading ? 'Searching...' : 'Search'}
         </button>
       </div>
@@ -853,8 +954,8 @@ const BloodFinderCard = ({ item, showUnits = false }) => (
       </div>
     </div>
     <div className="mt-4 flex flex-wrap gap-2">
-      {item.phoneNumber && <a className="btn-outline" href={`tel:${item.phoneNumber}`}>Call</a>}
-      {item.location?.coordinates?.length >= 2 && <a className="btn-primary" href={mapsUrl(item.location)} target="_blank" rel="noreferrer">Get Directions</a>}
+      {item.phoneNumber && <a className="btn-outline" href={`tel:${item.phoneNumber}`}><Phone size={16} /> Call</a>}
+      {item.location?.coordinates?.length >= 2 && <a className="btn-primary" href={mapsUrl(item.location)} target="_blank" rel="noreferrer"><Navigation size={16} /> Get Directions</a>}
     </div>
   </div>
 );
@@ -895,9 +996,9 @@ export const BloodInventory = () => {
   };
   return (
     <DashboardLayout title="Blood Inventory">
-      <div className="card mb-5 grid gap-3 md:grid-cols-4"><select className="input-field" value={form.bloodGroup} onChange={(e) => setForm({ ...form, bloodGroup: e.target.value })}>{BLOOD_GROUPS.map((group) => <option key={group}>{group}</option>)}</select><input className="input-field" type="number" value={form.units} onChange={(e) => setForm({ ...form, units: e.target.value })} /><input className="input-field" type="date" value={form.expiryDate} onChange={(e) => setForm({ ...form, expiryDate: e.target.value })} /><button className="btn-primary" onClick={save}>Add Stock</button></div>
-      <button className="btn-outline mb-4" onClick={() => exportCsv('inventory.csv', [['Blood Group', 'Units', 'Expiry'], ...(data || []).map((i) => [i.bloodGroup, i.units, fmtDate(i.expiryDate)])])}>Export CSV</button>
-      <PageTable headers={['Blood Group', 'Units', 'Expiry Date', 'Status', 'Actions']} rows={(data || []).map((item) => <tr key={item._id} className={item.units < 5 ? 'bg-red-50' : item.units <= 10 ? 'bg-amber-50' : ''}><td><BloodGroupBadge group={item.bloodGroup} size="sm" /></td><td>{item.units}</td><td>{fmtDate(item.expiryDate)}</td><td>{item.units < 5 ? 'Critical' : item.units <= 10 ? 'Warning' : 'Safe'}</td><td><button className="btn-outline" onClick={() => del(item._id)}>Delete</button></td></tr>)} />
+      <div className="card mb-5 grid gap-3 md:grid-cols-4"><select className="input-field" value={form.bloodGroup} onChange={(e) => setForm({ ...form, bloodGroup: e.target.value })}>{BLOOD_GROUPS.map((group) => <option key={group}>{group}</option>)}</select><input className="input-field" type="number" value={form.units} onChange={(e) => setForm({ ...form, units: e.target.value })} /><input className="input-field" type="date" value={form.expiryDate} onChange={(e) => setForm({ ...form, expiryDate: e.target.value })} /><button className="btn-primary" onClick={save}><Plus size={16} /> Add Stock</button></div>
+      <button className="btn-outline mb-4" onClick={() => exportCsv('inventory.csv', [['Blood Group', 'Units', 'Expiry'], ...(data || []).map((i) => [i.bloodGroup, i.units, fmtDate(i.expiryDate)])])}><Download size={16} /> Export CSV</button>
+      <PageTable headers={['Blood Group', 'Units', 'Expiry Date', 'Status', 'Actions']} rows={(data || []).map((item) => <tr key={item._id} className={item.units < 5 ? 'bg-red-50' : item.units <= 10 ? 'bg-amber-50' : ''}><td><BloodGroupBadge group={item.bloodGroup} size="sm" /></td><td>{item.units}</td><td>{fmtDate(item.expiryDate)}</td><td><span className={`badge-pill ${item.units < 5 ? 'bg-red-50 text-red-700' : item.units <= 10 ? 'bg-amber-50 text-amber-700' : 'bg-green-50 text-green-700'}`}>{item.units < 5 ? 'Critical' : item.units <= 10 ? 'Warning' : 'Safe'}</span></td><td><button className="btn-outline" onClick={() => del(item._id)}><Trash2 size={16} /> Delete</button></td></tr>)} />
     </DashboardLayout>
   );
 };
@@ -1060,8 +1161,8 @@ export const RaiseRequest = () => {
               {count === 0 && Number(form.radiusKm) >= 50 && <p className="mt-1 text-sm text-red-700">No eligible donors found at max radius. Contact hospitals directly.</p>}
             </div>
             <div className="flex flex-wrap gap-2">
-              <button className="btn-primary" onClick={submit} disabled={requestingLocation}>{requestingLocation ? 'Updating Location...' : isDonorSos ? 'Raise Emergency SOS' : 'Request Blood'}</button>
-              {isDonorSos && activeRequest?.status === 'open' && <button className="btn-outline" type="button" onClick={cancelRequest}>Cancel Request</button>}
+              <button className="btn-primary" onClick={submit} disabled={requestingLocation}><Droplet size={16} /> {requestingLocation ? 'Updating Location...' : isDonorSos ? 'Raise Emergency SOS' : 'Request Blood'}</button>
+              {isDonorSos && activeRequest?.status === 'open' && <button className="btn-outline" type="button" onClick={cancelRequest}><XCircle size={16} /> Cancel Request</button>}
             </div>
           </div>
         </div>
@@ -1202,7 +1303,7 @@ export const ChatPage = () => {
             </div>
             <form className="chat-input" onSubmit={send}>
               <input className="input-field" placeholder="Type a message" value={message} onChange={(e) => setMessage(e.target.value)} />
-              <button className="btn-primary">Send</button>
+              <button className="btn-primary"><Send size={16} /> Send</button>
             </form>
           </section>
         </div>
@@ -1228,7 +1329,7 @@ const RequestsList = ({ admin = false }) => {
         const acceptedDonor = item.acceptedDonor || item.respondingDonors?.find((entry) => entry.action === 'accept')?.donor;
         const canOpenChat = Boolean(!admin && item._id && acceptedDonor);
         const canFulfill = Boolean(!admin && item.status === 'responding' && item._id);
-        return <tr key={item._id || `request-${index}`}><td>{item.requestedBy?.firstName}</td><td><BloodGroupBadge group={item.bloodGroup} size="sm" /></td><td>{item.unitsNeeded}</td><td><span className={`badge-pill ${urgencyClass(item.urgency)}`}>{item.urgency}</span></td><td>{item.status}</td><td>{item.notifiedDonors?.length || 0}</td><td>{fmtDate(item.createdAt)}</td><td><div className="flex gap-2">{canOpenChat && <button className="btn-outline" onClick={() => navigate(`/${user?.role || 'hospital'}/chat/${item._id}`)}>Chat</button>}{canFulfill && <button className="btn-outline" onClick={() => setStatus(item._id, 'fulfilled')}>Mark Fulfilled</button>}</div></td></tr>;
+        return <tr key={item._id || `request-${index}`}><td>{item.requestedBy?.firstName}</td><td><BloodGroupBadge group={item.bloodGroup} size="sm" /></td><td>{item.unitsNeeded}</td><td><span className={`badge-pill ${urgencyClass(item.urgency)}`}>{item.urgency}</span></td><td><span className={`badge-pill ${statusClass(item.status)}`}>{item.status}</span></td><td>{item.notifiedDonors?.length || 0}</td><td>{fmtDate(item.createdAt)}</td><td><div className="flex gap-2">{canOpenChat && <button className="btn-outline" onClick={() => navigate(`/${user?.role || 'hospital'}/chat/${item._id}`)}><MessageCircle size={16} /> Chat</button>}{canFulfill && <button className="btn-outline" onClick={() => setStatus(item._id, 'fulfilled')}><CheckCircle size={16} /> Mark Fulfilled</button>}</div></td></tr>;
       })} />
     </DashboardLayout>
   );
@@ -1252,8 +1353,8 @@ export const DonorSearch = () => {
   };
   return (
     <DashboardLayout title="Donor Search">
-      <div className="card mb-5 grid gap-3 md:grid-cols-3"><select className="input-field" value={query.bloodGroup} onChange={(e) => setQuery({ ...query, bloodGroup: e.target.value })}><option value="">Any blood group</option>{BLOOD_GROUPS.map((g) => <option key={g}>{g}</option>)}</select><input className="input-field" placeholder="City" value={query.city} onChange={(e) => setQuery({ ...query, city: e.target.value })} /><button className="btn-primary" onClick={search}>Search</button></div>
-      <div className="page-grid">{results.map((item) => <div className="card" key={item._id}><h3 className="font-black">{item.firstName}</h3><BloodGroupBadge group={item.bloodGroup} /><p className="mt-2 text-sm">{item.city}</p><button className="btn-outline mt-3" onClick={() => toast.success('Direct notification ready')}>Request This Donor</button></div>)}</div>
+      <div className="card mb-5 grid gap-3 md:grid-cols-3"><select className="input-field" value={query.bloodGroup} onChange={(e) => setQuery({ ...query, bloodGroup: e.target.value })}><option value="">Any blood group</option>{BLOOD_GROUPS.map((g) => <option key={g}>{g}</option>)}</select><input className="input-field" placeholder="City" value={query.city} onChange={(e) => setQuery({ ...query, city: e.target.value })} /><button className="btn-primary" onClick={search}><SearchIcon size={16} /> Search</button></div>
+      <div className="page-grid">{results.map((item) => <div className="card" key={item._id}><h3 className="font-black">{item.firstName}</h3><BloodGroupBadge group={item.bloodGroup} /><p className="mt-2 text-sm">{item.city}</p><button className="btn-outline mt-3" onClick={() => toast.success('Direct notification ready')}><Droplet size={16} /> Request This Donor</button></div>)}{results.length === 0 && <Empty title="No donors found" text="Search by blood group and city to find eligible donors." />}</div>
     </DashboardLayout>
   );
 };
@@ -1284,11 +1385,11 @@ export const HospitalAppointments = () => {
             <td><BloodGroupBadge group={item.donor?.bloodGroup} size="sm" /></td>
             <td>{fmtDate(item.date)}</td>
             <td>{item.timeSlot}</td>
-            <td>{item.status}</td>
+            <td><span className={`badge-pill ${statusClass(item.status)}`}>{item.status}</span></td>
             <td>
               {item.status === 'scheduled' && (
                 <button className="btn-primary" type="button" onClick={() => complete(item._id)}>
-                  Mark Donated
+                  <CheckCircle size={16} /> Mark Donated
                 </button>
               )}
             </td>
@@ -1310,7 +1411,7 @@ export const ExpiryAlerts = () => {
       <div className="card mb-5"><p className="text-xl font-black">{week} units expiring this week</p></div>
       <PageTable headers={['Blood Group', 'Units', 'Expiry Date', 'Days Left', 'Actions']} rows={(data || []).map((item) => {
         const days = Math.ceil((new Date(item.expiryDate) - new Date()) / 86400000);
-        return <tr key={item._id}><td><BloodGroupBadge group={item.bloodGroup} size="sm" /></td><td>{item.units}</td><td>{fmtDate(item.expiryDate)}</td><td><span className={`badge-pill ${days <= 7 ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'}`}>{days}</span></td><td><button className="btn-outline" onClick={() => del(item._id)}>Discard</button></td></tr>;
+        return <tr key={item._id}><td><BloodGroupBadge group={item.bloodGroup} size="sm" /></td><td>{item.units}</td><td>{fmtDate(item.expiryDate)}</td><td><span className={`badge-pill ${days <= 7 ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'}`}>{days}</span></td><td><button className="btn-outline" onClick={() => del(item._id)}><Trash2 size={16} /> Discard</button></td></tr>;
       })} />
     </DashboardLayout>
   );
@@ -1347,7 +1448,7 @@ export const HospitalProfile = () => {
         <Field label="Pincode"><input className="input-field" value={form.pincode} onChange={(e) => setForm({ ...form, pincode: e.target.value })} /></Field>
         <Field label="License number"><input className="input-field" value={form.licenseNumber} onChange={(e) => setForm({ ...form, licenseNumber: e.target.value })} /></Field>
         <Field label="Address"><textarea className="input-field" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></Field>
-        <div className="md:col-span-2"><button className="btn-primary">Save Profile</button></div>
+        <div className="md:col-span-2"><button className="btn-primary"><Save size={16} /> Save Profile</button></div>
       </form>
     </DashboardLayout>
   );
@@ -1369,7 +1470,7 @@ export const AdminDashboard = () => {
             {data.inventory.critical.map((item) => (
               <div key={item.bloodGroup} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-100 bg-white p-3">
                 <div><BloodGroupBadge group={item.bloodGroup} size="sm" /><p className="mt-1 text-sm text-slate-600">{item.totalUnits || 0} units available</p></div>
-                <button className="btn-outline" onClick={() => navigate('/admin/broadcast', { state: { bloodGroup: item.bloodGroup } })}>Broadcast Alert</button>
+                <button className="btn-outline" onClick={() => navigate('/admin/broadcast', { state: { bloodGroup: item.bloodGroup } })}><Megaphone size={16} /> Broadcast Alert</button>
               </div>
             ))}
           </div>
@@ -1399,7 +1500,7 @@ export const UserManagement = () => {
   return (
     <DashboardLayout title="User Management">
       <div className="mb-4 flex flex-wrap gap-2">{['', 'donor', 'hospital', 'organization', 'admin'].map((r) => <button key={r || 'all'} className={role === r ? 'btn-primary' : 'btn-outline'} onClick={() => setRole(r)}>{r || 'All'}</button>)}</div>
-      <PageTable headers={['Name', 'Email', 'Role', 'Status', 'Joined', 'Actions']} rows={(data || []).map((u) => <tr key={u._id}><td>{u.firstName} {u.lastName}</td><td>{u.email}</td><td>{u.role}</td><td>{u.isActive ? 'Active' : 'Suspended'} {u.role === 'hospital' && !u.isApproved ? '/ Pending' : ''}</td><td>{fmtDate(u.createdAt)}</td><td className="flex gap-2">{u.role === 'hospital' && !u.isApproved && <button className="btn-outline" onClick={() => action(u._id, 'approve')}>Approve</button>}<button className="btn-outline" onClick={() => u.isActive ? openSuspend(u) : action(u._id, 'activate')}>{u.isActive ? 'Suspend' : 'Activate'}</button></td></tr>)} />
+      <PageTable headers={['Name', 'Email', 'Role', 'Status', 'Joined', 'Actions']} rows={(data || []).map((u) => <tr key={u._id}><td>{u.firstName} {u.lastName}</td><td>{u.email}</td><td><span className="role-badge">{u.role}</span></td><td><span className={`badge-pill ${u.isActive ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>{u.isActive ? 'Active' : 'Suspended'} {u.role === 'hospital' && !u.isApproved ? '/ Pending' : ''}</span></td><td>{fmtDate(u.createdAt)}</td><td className="flex gap-2">{u.role === 'hospital' && !u.isApproved && <button className="btn-outline" onClick={() => action(u._id, 'approve')}><ShieldCheck size={16} /> Approve</button>}<button className="btn-outline" onClick={() => u.isActive ? openSuspend(u) : action(u._id, 'activate')}>{u.isActive ? <XCircle size={16} /> : <CheckCircle size={16} />}{u.isActive ? 'Suspend' : 'Activate'}</button></td></tr>)} />
       {suspending && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-slate-900/40 p-4">
           <form className="card w-full max-w-md" onSubmit={confirmSuspend}>
@@ -1407,8 +1508,8 @@ export const UserManagement = () => {
             <p className="mt-1 text-sm text-slate-500">{suspending.firstName} {suspending.lastName}</p>
             <Field label="Reason"><textarea className="input-field mt-3" value={reason} onChange={(e) => setReason(e.target.value)} required /></Field>
             <div className="mt-4 flex justify-end gap-2">
-              <button type="button" className="btn-outline" onClick={() => setSuspending(null)}>Cancel</button>
-              <button className="btn-primary">Suspend</button>
+              <button type="button" className="btn-outline" onClick={() => setSuspending(null)}><X size={16} /> Cancel</button>
+              <button className="btn-primary"><XCircle size={16} /> Suspend</button>
             </div>
           </form>
         </div>
@@ -1459,7 +1560,7 @@ export const BroadcastAlerts = () => {
         <input className="input-field" placeholder="Title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
         <textarea className="input-field" placeholder="Message" value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} />
         <div className="rounded-lg border border-slate-200 p-4"><p className="font-black">{form.title || 'Preview title'}</p><p className="text-sm text-slate-500">{form.message || 'Preview message'}</p></div>
-        <button className="btn-primary" onClick={send}>Send Broadcast</button>
+        <button className="btn-primary" onClick={send}><Radio size={16} /> Send Broadcast</button>
       </div>
     </DashboardLayout>
   );
@@ -1468,21 +1569,29 @@ export const BroadcastAlerts = () => {
 export const SystemSettings = () => {
   const [settings, setSettings] = useState(() => JSON.parse(localStorage.getItem('bloodlinkSettings') || '{"radius":10,"expiry":14,"escalation":30}'));
   const save = () => { localStorage.setItem('bloodlinkSettings', JSON.stringify(settings)); toast.success('Settings saved'); };
-  return <DashboardLayout title="System Settings"><div className="card grid gap-4 md:grid-cols-3">{['radius', 'expiry', 'escalation'].map((key) => <Field key={key} label={key}><input className="input-field" type="number" value={settings[key]} onChange={(e) => setSettings({ ...settings, [key]: e.target.value })} /></Field>)}<button className="btn-primary md:col-span-3" onClick={save}>Save</button></div></DashboardLayout>;
+  return <DashboardLayout title="System Settings"><div className="card grid gap-4 md:grid-cols-3">{['radius', 'expiry', 'escalation'].map((key) => <Field key={key} label={key}><input className="input-field" type="number" value={settings[key]} onChange={(e) => setSettings({ ...settings, [key]: e.target.value })} /></Field>)}<button className="btn-primary md:col-span-3" onClick={save}><Save size={16} /> Save</button></div></DashboardLayout>;
 };
 
-export const Reports = () => <DashboardLayout title="Reports"><div className="card"><button className="btn-primary" onClick={() => toast.success('Report generated')}>Generate Report</button><button className="btn-outline ml-3" onClick={() => exportCsv('report.csv', [['Report'], ['BloodLink']])}>Export CSV</button></div></DashboardLayout>;
+export const Reports = () => <DashboardLayout title="Reports"><div className="card flex flex-wrap gap-3"><button className="btn-primary" onClick={() => toast.success('Report generated')}><CheckCircle size={16} /> Generate Report</button><button className="btn-outline" onClick={() => exportCsv('report.csv', [['Report'], ['BloodLink']])}><Download size={16} /> Export CSV</button></div></DashboardLayout>;
 
 const Chart = ({ title, data }) => (
   <div className="card h-80">
     <h3 className="mb-4 font-black">{title}</h3>
-    <ResponsiveContainer width="100%" height="85%"><BarChart data={data}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" /><YAxis /><Tooltip /><Bar dataKey="value" fill="#C0392B" /></BarChart></ResponsiveContainer>
+    {data?.length ? (
+      <ResponsiveContainer width="100%" height="85%"><BarChart data={data}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" /><YAxis /><Tooltip /><Bar dataKey="value" fill="#C0392B" /></BarChart></ResponsiveContainer>
+    ) : (
+      <Empty title="No chart data" text="Data will appear here once records are available." />
+    )}
   </div>
 );
 
 const PieBox = ({ title, data }) => (
   <div className="card h-80">
     <h3 className="mb-4 font-black">{title}</h3>
-    <ResponsiveContainer width="100%" height="85%"><PieChart><Pie data={data} dataKey="value" nameKey="name" outerRadius={90} label>{data.map((_, index) => <Cell key={index} fill={['#C0392B', '#1A2340', '#16A34A', '#D97706'][index % 4]} />)}</Pie><Tooltip /><Legend /></PieChart></ResponsiveContainer>
+    {data?.some((item) => item.value > 0) ? (
+      <ResponsiveContainer width="100%" height="85%"><PieChart><Pie data={data} dataKey="value" nameKey="name" outerRadius={90} label>{data.map((_, index) => <Cell key={index} fill={['#C0392B', '#1A2340', '#16A34A', '#D97706'][index % 4]} />)}</Pie><Tooltip /><Legend /></PieChart></ResponsiveContainer>
+    ) : (
+      <Empty title="No chart data" text="Data will appear here once records are available." />
+    )}
   </div>
 );

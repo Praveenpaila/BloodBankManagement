@@ -1,6 +1,7 @@
 import { yupResolver } from '@hookform/resolvers/yup';
 import { useForm, useWatch } from 'react-hook-form';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Droplet, KeyRound, LogIn, Send, UserPlus } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as yup from 'yup';
 import api from '../../api/axios';
@@ -55,10 +56,18 @@ const RegisterPage = () => {
   };
 
   return (
-    <main className="grid min-h-screen place-items-center p-4">
+    <main className="grid min-h-screen place-items-center p-4 sm:p-6">
       <form className="card w-full max-w-3xl" onSubmit={handleSubmit(submit)}>
-        <h1 className="text-2xl font-black">Create BloodLink Account</h1>
-        <div className="mt-5 grid grid-cols-3 gap-2">
+        <div className="mb-5 flex items-center gap-3 rounded-lg border border-red-100 bg-red-50 p-4 text-[#982f25]">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white text-[#C0392B] shadow-sm">
+            <Droplet size={24} fill="currentColor" />
+          </span>
+          <div>
+            <h1 className="text-2xl font-black text-slate-900">Create BloodLink Account</h1>
+            <p className="text-sm font-bold">Save Lives. Donate Blood.</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-2 max-sm:grid-cols-1">
           {['donor', 'hospital', 'organization'].map((item) => (
             <button
               className={role === item ? 'btn-primary' : 'btn-outline'}
@@ -91,11 +100,11 @@ const RegisterPage = () => {
           <div><input className="input-field" type="password" placeholder="Confirm password" {...register('confirmPassword')} />{errors.confirmPassword && <p className="text-sm text-red-600">{errors.confirmPassword.message}</p>}</div>
           <div className="flex gap-2">
             <input className="input-field" placeholder="OTP" {...register('otp')} />
-            <button className="btn-outline" type="button" onClick={sendOtp}>Send OTP</button>
+            <button className="btn-outline" type="button" onClick={sendOtp}><Send size={16} /> Send OTP</button>
           </div>
         </div>
-        <button className="btn-primary mt-5 w-full" disabled={isSubmitting}>{isSubmitting ? 'Creating...' : 'Register'}</button>
-        <p className="mt-4 text-sm">Already registered? <Link className="font-bold text-[#C0392B]" to="/login">Login</Link></p>
+        <button className="btn-primary mt-5 w-full" disabled={isSubmitting}><UserPlus size={16} /> {isSubmitting ? 'Creating...' : 'Register'}</button>
+        <p className="mt-4 text-sm">Already registered? <Link className="inline-flex items-center gap-1 font-bold text-[#C0392B]" to="/login"><LogIn size={15} /> Login</Link></p>
       </form>
     </main>
   );

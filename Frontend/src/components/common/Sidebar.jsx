@@ -1,66 +1,104 @@
+import {
+  Award,
+  BarChart3,
+  Bell,
+  CalendarDays,
+  ClipboardCheck,
+  ClipboardList,
+  FileText,
+  HeartPulse,
+  Home,
+  Map,
+  Megaphone,
+  Package,
+  Search,
+  Settings,
+  ShieldCheck,
+  Siren,
+  SlidersHorizontal,
+  User,
+  Users,
+} from 'lucide-react';
+import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/authStore';
 
-const sidebarItems = {
+export const sidebarItems = {
   donor: [
-    ['Dashboard', 'Home', '/donor/dashboard'],
-    ['My Profile', 'User', '/donor/profile'],
-    ['Eligibility Check', 'Check', '/donor/eligibility'],
-    ['Book Appointment', 'Date', '/donor/appointments'],
-    ['Donation History', 'Log', '/donor/history'],
-    ['Badges & Points', 'Award', '/donor/badges'],
-    ['Notifications', 'Bell', '/donor/notifications'],
-    ['Nearby Requests', 'Map', '/donor/nearby-requests'],
-    ['Find Blood', 'Find', '/donor/blood-finder'],
-    ['Emergency SOS', 'SOS', '/donor/sos'],
+    ['Dashboard', Home, '/donor/dashboard'],
+    ['My Profile', User, '/donor/profile'],
+    ['Eligibility Check', ClipboardCheck, '/donor/eligibility'],
+    ['Book Appointment', CalendarDays, '/donor/appointments'],
+    ['Donation History', ClipboardList, '/donor/history'],
+    ['Badges & Points', Award, '/donor/badges'],
+    ['Notifications', Bell, '/donor/notifications'],
+    ['Nearby Requests', Map, '/donor/nearby-requests'],
+    ['Find Blood', Search, '/donor/blood-finder'],
+    ['Emergency SOS', Siren, '/donor/sos'],
   ],
   hospital: [
-    ['Dashboard', 'Home', '/hospital/dashboard'],
-    ['Blood Inventory', 'Stock', '/hospital/inventory'],
-    ['Raise Request', 'SOS', '/hospital/raise-request'],
-    ['Request Status', 'List', '/hospital/requests'],
-    ['Appointments', 'Date', '/hospital/appointments'],
-    ['Donor Search', 'Find', '/hospital/donor-search'],
-    ['Find Blood', 'Map', '/hospital/blood-finder'],
-    ['Expiry Alerts', 'Clock', '/hospital/expiry-alerts'],
-    ['Profile', 'Care', '/hospital/profile'],
-    ['Notifications', 'Bell', '/hospital/notifications'],
+    ['Dashboard', Home, '/hospital/dashboard'],
+    ['Blood Inventory', Package, '/hospital/inventory'],
+    ['Raise Request', Siren, '/hospital/raise-request'],
+    ['Request Status', ClipboardList, '/hospital/requests'],
+    ['Appointments', CalendarDays, '/hospital/appointments'],
+    ['Donor Search', Search, '/hospital/donor-search'],
+    ['Find Blood', Map, '/hospital/blood-finder'],
+    ['Expiry Alerts', HeartPulse, '/hospital/expiry-alerts'],
+    ['Profile', User, '/hospital/profile'],
+    ['Notifications', Bell, '/hospital/notifications'],
   ],
   admin: [
-    ['Dashboard', 'Home', '/admin/dashboard'],
-    ['Users', 'Users', '/admin/users'],
-    ['Inventory', 'Stock', '/admin/inventory'],
-    ['Requests', 'List', '/admin/requests'],
-    ['Analytics', 'Chart', '/admin/analytics'],
-    ['Broadcast', 'Cast', '/admin/broadcast'],
-    ['Settings', 'Gear', '/admin/settings'],
-    ['Reports', 'Docs', '/admin/reports'],
+    ['Dashboard', Home, '/admin/dashboard'],
+    ['Users', Users, '/admin/users'],
+    ['Inventory', Package, '/admin/inventory'],
+    ['Requests', ClipboardList, '/admin/requests'],
+    ['Analytics', BarChart3, '/admin/analytics'],
+    ['Broadcast', Megaphone, '/admin/broadcast'],
+    ['Settings', Settings, '/admin/settings'],
+    ['Reports', FileText, '/admin/reports'],
   ],
 };
 
-const Sidebar = ({ role }) => {
+const SidebarContent = ({ role, collapsed }) => {
   const { logout } = useAuth();
   const items = sidebarItems[role] || [];
 
   return (
-    <aside className="sticky top-[65px] hidden h-[calc(100vh-65px)] w-64 border-r border-slate-200 bg-white p-3 lg:block">
-      <div className="flex h-full flex-col gap-1">
-        {items.map(([label, icon, path]) => (
-          <NavLink
-            key={path}
-            to={path}
-            className={({ isActive }) =>
-              `flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-bold ${
-                isActive ? 'bg-[#C0392B] text-white' : 'text-slate-700 hover:bg-slate-100'
-              }`
-            }
-          >
-            <span className="min-w-9 text-xs font-black uppercase tracking-wide">{icon}</span>
-            <span>{label}</span>
-          </NavLink>
-        ))}
-        <button className="btn-outline mt-auto" onClick={logout}>Logout</button>
-      </div>
+    <div className="flex h-full flex-col gap-1">
+      {items.map(([label, Icon, path]) => (
+        <NavLink
+          key={path}
+          to={path}
+          title={collapsed ? label : undefined}
+          className={({ isActive }) =>
+            `sidebar-link ${collapsed ? 'justify-center px-2' : ''} ${
+              isActive ? 'is-active' : ''
+            }`
+          }
+        >
+          <Icon size={18} />
+          {!collapsed && <span>{label}</span>}
+        </NavLink>
+      ))}
+      <button className="btn-outline mt-auto" onClick={logout}>
+        <ShieldCheck size={16} />
+        {!collapsed && 'Logout'}
+      </button>
+    </div>
+  );
+};
+
+const Sidebar = ({ role }) => {
+  const [collapsed, setCollapsed] = useState(false);
+
+  return (
+    <aside className={`dashboard-sidebar hidden md:block ${collapsed ? 'is-collapsed' : ''}`}>
+      <button className="btn-outline mb-3 w-full" type="button" onClick={() => setCollapsed((value) => !value)}>
+        <SlidersHorizontal size={16} />
+        {!collapsed && 'Collapse'}
+      </button>
+      <SidebarContent role={role} collapsed={collapsed} />
     </aside>
   );
 };

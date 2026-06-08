@@ -3,6 +3,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState } from 
 import toast from 'react-hot-toast';
 import { io } from 'socket.io-client';
 import { useNavigate } from 'react-router-dom';
+import { MapPin } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from './authStore';
 
@@ -144,7 +145,7 @@ export const SocketProvider = ({ children }) => {
             <p className="alert-toast__title">{notification.title}</p>
             <p className="alert-toast__message">{notification.message}</p>
             {Number.isFinite(Number(notification.data?.distanceKm)) && (
-              <p className="alert-toast__message">📍 {Number(notification.data.distanceKm).toFixed(1)} km from your location</p>
+              <p className="alert-toast__message flex items-center gap-1"><MapPin size={15} /> {Number(notification.data.distanceKm).toFixed(1)} km from your location</p>
             )}
           </div>
         </div>
@@ -231,7 +232,7 @@ export const SocketProvider = ({ children }) => {
             <h2 id="sos-alarm-title">{activeSos.title}</h2>
             <p>{activeSos.message}</p>
             {Number.isFinite(Number(activeSos.data?.distanceKm)) && (
-              <p className="font-bold">📍 {Number(activeSos.data.distanceKm).toFixed(1)} km from your location</p>
+              <p className="flex items-center justify-center gap-1 font-bold"><MapPin size={16} /> {Number(activeSos.data.distanceKm).toFixed(1)} km from your location</p>
             )}
             <div className="sos-alarm__meta">
               <span>{activeSos.data?.bloodGroup}</span>

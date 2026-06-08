@@ -8,5 +8,7 @@ router.get("/", protect, controller.getNotifications);
 router.post("/", protect, controller.createNotification);
 router.put("/read-all", protect, controller.markAllRead);
 router.put("/:id/read", protect, controller.markOneRead);
+router.delete("/all", protect, controller.deleteAll);
+router.delete("/:id", protect, controller.deleteOne);
 
 module.exports = router;

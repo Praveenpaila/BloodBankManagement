@@ -62,6 +62,48 @@ exports.markAllRead = async (req, res) => {
   }
 };
 
+exports.deleteOne = async (req, res) => {
+  try {
+    const notification = await Notification.findOneAndDelete({
+      _id: req.params.id,
+      recipient: req.user._id,
+    });
+
+    if (!notification) {
+      return res.status(404).json({
+        success: false,
+        message: "Notification not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Notification deleted",
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: err.message || "Error deleting notification",
+    });
+  }
+};
+
+exports.deleteAll = async (req, res) => {
+  try {
+    await Notification.deleteMany({ recipient: req.user._id });
+
+    return res.status(200).json({
+      success: true,
+      message: "Notifications cleared",
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: err.message || "Error clearing notifications",
+    });
+  }
+};
+
 exports.createNotification = async (req, res) => {
   try {
     const notification = await Notification.create({

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Mail, MapPin, Phone, Send } from 'lucide-react';
 import toast from 'react-hot-toast';
 import PublicLayout from '../shared/PublicLayout';
 
@@ -19,8 +20,12 @@ const ContactPage = () => {
             <h2 className="text-xl font-black">Get in touch</h2>
             <p className="mt-2 text-sm text-slate-600">Questions about donations, hospital onboarding, or emergency support? Reach out anytime.</p>
           </div>
-          {['Phone: +91 90000 00000', 'Email: support@bloodlink.com', 'Address: Vijayawada, Andhra Pradesh'].map((item) => (
-            <div className="card" key={item}>{item}</div>
+          {[
+            [Phone, 'Phone: +91 90000 00000'],
+            [Mail, 'Email: support@bloodlink.com'],
+            [MapPin, 'Address: Vijayawada, Andhra Pradesh'],
+          ].map(([Icon, item]) => (
+            <div className="card flex items-center gap-3" key={item}><Icon className="text-[#C0392B]" size={18} /> {item}</div>
           ))}
         </div>
         <form className="card grid gap-3" onSubmit={submit}>
@@ -29,7 +34,7 @@ const ContactPage = () => {
           <input className="input-field" type="email" placeholder="Email address" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
           <input className="input-field" placeholder="Subject" value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} required />
           <textarea className="input-field" placeholder="How can we help?" rows="5" value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} required />
-          <button className="btn-primary">Send Message</button>
+          <button className="btn-primary"><Send size={16} /> Send Message</button>
         </form>
       </section>
     </PublicLayout>

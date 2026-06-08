@@ -2,9 +2,12 @@
 @import "react-datepicker/dist/react-datepicker.css";
 
 :root {
-  --primary: #c0392b;
-  --primary-dark: #982f25;
-  --navy: #18223a;
+  --primary: #E53E3E;
+  --primary-dark: #B83232;
+  --accent: #E53E3E;
+  --dark-bg: #1A1A2E;
+  --card-bg: #16213E;
+  --navy: #1A1A2E;
   --teal: #0f766e;
   --amber: #b45309;
   --bg: #f5f7fb;
@@ -12,7 +15,7 @@
   --border: #d9e1ec;
   --text: #172033;
   --muted: #647084;
-  --ring: rgba(192, 57, 43, 0.16);
+  --ring: rgba(229, 62, 62, 0.16);
 }
 
 * {
@@ -40,6 +43,14 @@ input,
 select,
 textarea {
   font: inherit;
+}
+
+button,
+.card,
+.sidebar-link,
+.profile-trigger,
+.icon-button {
+  transition: all 0.2s ease;
 }
 
 .btn-primary {
@@ -84,6 +95,51 @@ textarea {
   background: #f8fafc;
 }
 
+.btn-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1px solid #dc2626;
+  border-radius: 0.45rem;
+  background: #dc2626;
+  color: white;
+  font-weight: 800;
+  padding: 0.7rem 1rem;
+  min-height: 2.75rem;
+  box-shadow: 0 10px 22px rgba(220, 38, 38, 0.16);
+}
+
+.btn-danger:hover {
+  background: #b91c1c;
+  transform: translateY(-1px);
+}
+
+.icon-button {
+  display: inline-grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: white;
+  color: var(--text);
+}
+
+.icon-button:hover {
+  border-color: #b8c3d3;
+  background: #f8fafc;
+}
+
+.icon-button.danger {
+  color: #dc2626;
+}
+
+.icon-button.danger:hover {
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
 .btn-primary:focus-visible,
 .btn-outline:focus-visible,
 .input-field:focus-visible,
@@ -100,6 +156,11 @@ textarea {
   border-radius: 0.5rem;
   padding: 1.25rem;
   box-shadow: 0 14px 34px rgba(15, 23, 42, 0.07);
+}
+
+.card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.09);
 }
 
 .input-field {
@@ -138,6 +199,168 @@ textarea {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   gap: 1rem;
+}
+
+.page-enter {
+  animation: fadeIn 0.3s ease forwards;
+}
+
+.empty-state {
+  display: grid;
+  min-height: 12rem;
+  place-items: center;
+  border: 1px dashed #cbd5e1;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.78);
+  padding: 2rem;
+  text-align: center;
+  color: var(--muted);
+}
+
+.empty-state svg {
+  color: var(--primary);
+}
+
+.empty-state h3 {
+  margin-top: 0.75rem;
+  color: var(--text);
+  font-size: 1.05rem;
+  font-weight: 950;
+}
+
+.empty-state p {
+  margin-top: 0.25rem;
+  max-width: 28rem;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.dashboard-sidebar {
+  position: sticky;
+  top: 65px;
+  width: 16rem;
+  height: calc(100vh - 65px);
+  border-right: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.98);
+  padding: 0.75rem;
+}
+
+.dashboard-sidebar.is-collapsed {
+  width: 5rem;
+}
+
+.dashboard-sidebar.mobile-drawer {
+  position: fixed;
+  inset: 0 auto 0 0;
+  top: 0;
+  z-index: 60;
+  width: min(18rem, 86vw);
+  height: 100vh;
+  box-shadow: 22px 0 42px rgba(15, 23, 42, 0.25);
+}
+
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border-radius: 0.55rem;
+  padding: 0.65rem 0.75rem;
+  color: #334155;
+  font-size: 0.9rem;
+  font-weight: 850;
+}
+
+.sidebar-link:hover {
+  background: #f1f5f9;
+}
+
+.sidebar-link.is-active {
+  background: var(--primary);
+  color: white;
+  box-shadow: 0 10px 22px rgba(229, 62, 62, 0.18);
+}
+
+.avatar-circle {
+  display: grid;
+  width: 2.35rem;
+  height: 2.35rem;
+  place-items: center;
+  border-radius: 999px;
+  background: #fee2e2;
+  color: var(--primary-dark);
+  font-weight: 950;
+}
+
+.profile-trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: white;
+  padding: 0.35rem 0.55rem 0.35rem 0.35rem;
+}
+
+.profile-trigger:hover {
+  background: #f8fafc;
+}
+
+.role-badge {
+  display: inline-flex;
+  border-radius: 999px;
+  background: #f1f5f9;
+  padding: 0.1rem 0.45rem;
+  color: #64748b;
+  font-size: 0.68rem;
+  font-weight: 900;
+  text-transform: capitalize;
+}
+
+.profile-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.55rem);
+  z-index: 50;
+  display: grid;
+  min-width: 12rem;
+  gap: 0.25rem;
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+  background: white;
+  padding: 0.45rem;
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.16);
+}
+
+.profile-menu a,
+.profile-menu button {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  border: 0;
+  border-radius: 0.45rem;
+  background: transparent;
+  padding: 0.65rem 0.7rem;
+  color: var(--text);
+  font-weight: 800;
+  text-align: left;
+}
+
+.profile-menu a:hover,
+.profile-menu button:hover {
+  background: #f8fafc;
+}
+
+.mobile-menu-toggle,
+.mobile-nav-panel {
+  display: none !important;
+}
+
+.skeleton-card {
+  min-height: 8rem;
+  border-radius: 0.75rem;
+  background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 37%, #e2e8f0 63%);
+  background-size: 400% 100%;
+  animation: skeleton 1.25s ease infinite;
 }
 
 .table-wrap {
@@ -561,7 +784,66 @@ th {
   }
 }
 
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes skeleton {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #94a3b8 #e2e8f0;
+}
+
+*::-webkit-scrollbar {
+  width: 0.55rem;
+  height: 0.55rem;
+}
+
+*::-webkit-scrollbar-track {
+  background: #e2e8f0;
+}
+
+*::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #94a3b8;
+}
+
 @media (max-width: 768px) {
+  body {
+    background: var(--bg);
+  }
+
+  .card {
+    padding: 1rem;
+  }
+
+  .page-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mobile-menu-toggle {
+    display: inline-flex !important;
+  }
+
+  .mobile-nav-panel {
+    display: block !important;
+  }
+
   .eligibility-steps,
   .request-console,
   .chat-shell {

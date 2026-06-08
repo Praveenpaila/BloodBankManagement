@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { Droplet, LogIn, MapPin, UserPlus } from "lucide-react";
 import PublicLayout from "../shared/PublicLayout";
 import { BLOOD_GROUPS, COMPATIBILITY } from "../../utils/bloodGroups";
 import BloodGroupBadge from "../../components/common/BloodGroupBadge";
@@ -18,10 +19,10 @@ const LandingPage = () => (
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
             <Link className="btn-primary" to="/register">
-              Register as Donor
+              <UserPlus size={16} /> Register as Donor
             </Link>
             <Link className="btn-outline" to="/login">
-              Login
+              <LogIn size={16} /> Login
             </Link>
           </div>
         </div>
@@ -53,7 +54,11 @@ const LandingPage = () => (
       <div className="page-grid">
         {["Register", "Get Matched", "Donate"].map((step, index) => (
           <div className="card" key={step}>
-            <div className="mb-3 text-3xl">{["📝", "📍", "🩸"][index]}</div>
+            <div className="mb-3 text-[#C0392B]">
+              {index === 0 && <UserPlus size={28} />}
+              {index === 1 && <MapPin size={28} />}
+              {index === 2 && <Droplet size={28} fill="currentColor" />}
+            </div>
             <h3 className="text-lg font-black">{step}</h3>
             <p className="mt-2 text-sm text-slate-500">
               A simple workflow built for quick response and clear status

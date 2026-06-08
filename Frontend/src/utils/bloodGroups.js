@@ -2,13 +2,13 @@ export const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
 
 export const BLOOD_GROUP_COLORS = {
   'A+': 'red',
-  'A-': 'red',
+  'A-': 'rose',
   'B+': 'blue',
-  'B-': 'blue',
+  'B-': 'cyan',
   'O+': 'green',
-  'O-': 'green',
+  'O-': 'emerald',
   'AB+': 'purple',
-  'AB-': 'purple',
+  'AB-': 'fuchsia',
 };
 
 export const COMPATIBILITY = {

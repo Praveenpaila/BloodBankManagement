@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Droplet, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
 import PublicLayout from '../shared/PublicLayout';
 import api from '../../api/axios';
@@ -36,7 +37,7 @@ const PublicSearchPage = () => {
             {BLOOD_GROUPS.map((group) => <option key={group}>{group}</option>)}
           </select>
           <input className="input-field" placeholder="City" value={filters.city} onChange={(e) => setFilters({ ...filters, city: e.target.value })} />
-          <button className="btn-primary" disabled={loading}>{loading ? 'Searching...' : 'Search'}</button>
+          <button className="btn-primary" disabled={loading}><Search size={16} /> {loading ? 'Searching...' : 'Search'}</button>
         </form>
         {results && (
           <div className="mt-5 space-y-3">
@@ -44,7 +45,11 @@ const PublicSearchPage = () => {
               <h2 className="text-xl font-black">{results.count} eligible donor{results.count === 1 ? '' : 's'} found</h2>
             </div>
             {results.data.length === 0 ? (
-              <div className="card text-center text-sm font-bold text-slate-500">No donors match your search. Try a different city or blood group.</div>
+              <div className="empty-state">
+                <Droplet size={34} />
+                <h3>No donors found</h3>
+                <p>No donors match your search. Try a different city or blood group.</p>
+              </div>
             ) : (
               <div className="grid gap-3 md:grid-cols-2">
                 {results.data.map((donor) => (
