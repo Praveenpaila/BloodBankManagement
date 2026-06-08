@@ -1095,7 +1095,11 @@ export const RaiseRequest = () => {
         lat: requestLocation.lat,
         lng: requestLocation.lng,
       });
-      toast.success(`SOS sent to ${data.data.notifiedDonors} donors by ${data.data.matchingAlgorithm}`);
+      if (data.data.notifiedDonors > 0) {
+        toast.success(`SOS sent to ${data.data.notifiedDonors} donors by ${data.data.matchingAlgorithm}`);
+      } else {
+        toast.error('SOS created, but no eligible nearby donors matched this blood group and radius.');
+      }
       setActiveRequest(data.data.request);
       reload();
     } catch (err) {
@@ -1174,6 +1178,65 @@ export const RaiseRequest = () => {
 export const RequestStatus = () => <RequestsList hospital />;
 export const RequestsLog = () => <RequestsList admin />;
 
+export const ConversationsPage = () => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { socket } = useSocket();
+  const { data, reload } = useApi(async () => (await api.get('/chats')).data.data, []);
+
+  useEffect(() => {
+    if (!socket) return undefined;
+    const refresh = () => reload();
+    socket.on('chat:ready', refresh);
+    socket.on('chat:unread', refresh);
+    socket.on('blood-request:fulfilled', refresh);
+    return () => {
+      socket.off('chat:ready', refresh);
+      socket.off('chat:unread', refresh);
+      socket.off('blood-request:fulfilled', refresh);
+    };
+    // reload is provided by useApi and intentionally used for socket refreshes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [socket]);
+
+  const conversations = (data || []).filter(Boolean);
+  const active = conversations.filter((item) => item.request?.status === 'responding');
+  const closed = conversations.filter((item) => item.request?.status !== 'responding');
+  const ordered = [...active, ...closed];
+
+  return (
+    <DashboardLayout title="Chats" subtitle="Accepted request chats stay here until the donation is completed.">
+      <div className="space-y-3">
+        {ordered.map((item) => {
+          const requesterId = item.requester?._id || item.requester;
+          const isRequester = String(requesterId) === String(user?._id);
+          const other = isRequester ? item.donor : item.requester;
+          const lastMessage = item.messages?.[item.messages.length - 1];
+          const requestId = item.request?._id || item.request;
+          return (
+            <div key={item._id} className="card flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <BloodGroupBadge group={item.request?.bloodGroup} size="sm" />
+                  <span className={`badge-pill ${statusClass(item.request?.status)}`}>{item.request?.status}</span>
+                </div>
+                <h3 className="mt-2 font-black">{other?.hospitalName || `${other?.firstName || ''} ${other?.lastName || ''}`.trim() || 'BloodLink user'}</h3>
+                <p className="mt-1 text-sm text-slate-600">
+                  {lastMessage?.message || `${item.request?.unitsNeeded || 1} unit(s) requested`}
+                </p>
+              </div>
+              <button className="btn-primary" type="button" onClick={() => navigate(`/${user?.role || 'donor'}/chat/${requestId}`)}>
+                <MessageCircle size={16} /> Open Chat
+              </button>
+            </div>
+          );
+        })}
+        {ordered.length === 0 && <Empty title="No chats yet" text="Accepted blood request chats will appear here." />}
+      </div>
+    </DashboardLayout>
+  );
+};
+
 export const ChatPage = () => {
   const { requestId } = useParams();
   const { user } = useAuth();
@@ -1211,13 +1274,30 @@ export const ChatPage = () => {
           : [...(current.messages || []), incoming],
       } : current);
     };
+    const onStatus = ({ requestId: incomingRequestId, status }) => {
+      if (String(incomingRequestId) !== String(requestId)) return;
+      setConversation((current) => current ? {
+        ...current,
+        request: { ...current.request, status },
+      } : current);
+    };
     socket.on('chat:message', onMessage);
-    return () => socket.off('chat:message', onMessage);
+    socket.on('blood-request:fulfilled', onStatus);
+    socket.on('blood-request:cancelled', onStatus);
+    return () => {
+      socket.off('chat:message', onMessage);
+      socket.off('blood-request:fulfilled', onStatus);
+      socket.off('blood-request:cancelled', onStatus);
+    };
   }, [socket, requestId]);
 
   const send = async (event) => {
     event.preventDefault();
     if (!message.trim()) return;
+    if (['fulfilled', 'cancelled'].includes(conversation?.request?.status)) {
+      toast.error('This chat is closed because the request is complete.');
+      return;
+    }
     try {
       await api.post(`/chats/${requestId}/messages`, { message });
       setMessage('');
@@ -1230,6 +1310,7 @@ export const ChatPage = () => {
   const requesterId = requester?._id || requester;
   const isRequester = String(requesterId) === String(user?._id);
   const other = isRequester ? conversation?.donor : requester;
+  const chatClosed = ['fulfilled', 'cancelled'].includes(conversation?.request?.status);
 
   const completeDonation = async () => {
     setCompleting(true);
@@ -1302,8 +1383,8 @@ export const ChatPage = () => {
               })}
             </div>
             <form className="chat-input" onSubmit={send}>
-              <input className="input-field" placeholder="Type a message" value={message} onChange={(e) => setMessage(e.target.value)} />
-              <button className="btn-primary"><Send size={16} /> Send</button>
+              <input className="input-field" placeholder={chatClosed ? 'Donation completed. Chat closed.' : 'Type a message'} value={message} onChange={(e) => setMessage(e.target.value)} disabled={chatClosed} />
+              <button className="btn-primary" disabled={chatClosed}><Send size={16} /> Send</button>
             </form>
           </section>
         </div>
@@ -1319,8 +1400,13 @@ const RequestsList = ({ admin = false }) => {
   const { data, reload } = useApi(async () => (await api.get(endpoint)).data, []);
   const rows = admin ? data?.data || [] : data?.data || [];
   const setStatus = async (id, status) => {
-    await api.put(`/blood-requests/${id}/status`, { status });
-    toast.success('Status updated');
+    if (status === 'fulfilled') {
+      await api.put(`/blood-requests/${id}/complete-donation`);
+      toast.success('Donation completed');
+    } else {
+      await api.put(`/blood-requests/${id}/status`, { status });
+      toast.success('Status updated');
+    }
     reload();
   };
   return (

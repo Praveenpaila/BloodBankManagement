@@ -10,6 +10,7 @@ import {
   Home,
   Map,
   Megaphone,
+  MessageCircle,
   Package,
   Search,
   Settings,
@@ -32,6 +33,7 @@ export const sidebarItems = {
     ['Donation History', ClipboardList, '/donor/history'],
     ['Badges & Points', Award, '/donor/badges'],
     ['Notifications', Bell, '/donor/notifications'],
+    ['Chats', MessageCircle, '/donor/chats'],
     ['Nearby Requests', Map, '/donor/nearby-requests'],
     ['Find Blood', Search, '/donor/blood-finder'],
     ['Emergency SOS', Siren, '/donor/sos'],
@@ -47,6 +49,7 @@ export const sidebarItems = {
     ['Expiry Alerts', HeartPulse, '/hospital/expiry-alerts'],
     ['Profile', User, '/hospital/profile'],
     ['Notifications', Bell, '/hospital/notifications'],
+    ['Chats', MessageCircle, '/hospital/chats'],
   ],
   admin: [
     ['Dashboard', Home, '/admin/dashboard'],

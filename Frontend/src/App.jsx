@@ -15,6 +15,7 @@ import {
   BookAppointment,
   BroadcastAlerts,
   ChatPage,
+  ConversationsPage,
   DonorAnalytics,
   DonorDashboard,
   DonorProfile,
@@ -70,6 +71,7 @@ function App() {
       <Route path="/donor/history" element={<Protected role="donor"><DonationHistory /></Protected>} />
       <Route path="/donor/badges" element={<Protected role="donor"><BadgesPage /></Protected>} />
       <Route path="/donor/notifications" element={<Protected role="donor"><NotificationsPage /></Protected>} />
+      <Route path="/donor/chats" element={<Protected role="donor"><ConversationsPage /></Protected>} />
       <Route path="/donor/nearby-requests" element={<Protected role="donor"><NearbyRequestsPage /></Protected>} />
       <Route path="/donor/blood-finder" element={<Protected role="donor"><BloodFinder /></Protected>} />
       <Route path="/donor/sos" element={<Protected role="donor"><RaiseRequest /></Protected>} />
@@ -86,6 +88,7 @@ function App() {
       <Route path="/hospital/appointments" element={<Protected role="hospital"><HospitalAppointments /></Protected>} />
       <Route path="/hospital/profile" element={<Protected role="hospital"><HospitalProfile /></Protected>} />
       <Route path="/hospital/notifications" element={<Protected role="hospital"><HospitalNotifications /></Protected>} />
+      <Route path="/hospital/chats" element={<Protected role="hospital"><ConversationsPage /></Protected>} />
       <Route path="/hospital/chat/:requestId" element={<Protected role="hospital"><ChatPage /></Protected>} />
 
       <Route path="/admin/dashboard" element={<Protected role="admin"><AdminDashboard /></Protected>} />

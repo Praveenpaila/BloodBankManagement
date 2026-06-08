@@ -48,6 +48,7 @@ app.use("/api/inventory", require("./routes/inventoryRoutes"));
 app.use("/api/blood-finder", require("./routes/bloodFinderRoutes"));
 app.use("/api/blood-requests", require("./routes/bloodRequestRoutes"));
 app.use("/api/notifications", require("./routes/notificationRoutes"));
+app.use("/api/push", require("./routes/pushRoutes"));
 app.use("/api/donors", require("./routes/donorRoutes"));
 app.use("/api/hospitals", require("./routes/hospitalRoutes"));
 app.use("/api/appointments", require("./routes/appointmentRoutes"));

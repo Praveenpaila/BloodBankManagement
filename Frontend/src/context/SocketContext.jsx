@@ -6,19 +6,26 @@ import { useNavigate } from 'react-router-dom';
 import { MapPin } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from './authStore';
+import { registerPushSubscription } from '../utils/pushSubscription';
 
 const SocketContext = createContext(null);
 
 const socketUrl = (import.meta.env.VITE_API_URL || 'http://localhost:3000/api').replace(/\/api\/?$/, '');
 const SOS_ALERT_DURATION_MS = 60 * 1000;
 
+const supportsBrowserNotifications = () => typeof window !== 'undefined' && 'Notification' in window;
+
 export const SocketProvider = ({ children }) => {
   const { token, isAuthenticated, user, updateUser } = useAuth();
   const navigate = useNavigate();
   const [activeSos, setActiveSos] = useState(null);
+  const [notificationPermission, setNotificationPermission] = useState(
+    supportsBrowserNotifications() ? window.Notification.permission : 'unsupported',
+  );
   const alarmTimer = useRef(null);
   const alarmStopTimer = useRef(null);
   const audioContext = useRef(null);
+  const pushRegisteredForUser = useRef(null);
   const socket = useMemo(() => {
     if (!isAuthenticated || !token) return null;
     return io(socketUrl, {
@@ -58,6 +65,59 @@ export const SocketProvider = ({ children }) => {
       oscillator.stop(context.currentTime + 0.45);
     } catch {
       // Browsers can block audio until a user gesture; vibration and the modal still run.
+    }
+  };
+
+  const requestNotificationPermission = async ({ showToast = true } = {}) => {
+    if (!supportsBrowserNotifications()) {
+      if (showToast) toast.error('Browser notifications are not supported here');
+      setNotificationPermission('unsupported');
+      return 'unsupported';
+    }
+
+    try {
+      const permission = await registerPushSubscription(api);
+      const currentPermission = permission || window.Notification.permission;
+      setNotificationPermission(currentPermission);
+
+      if (showToast) {
+        if (currentPermission === 'granted') {
+          toast.success('Alerts enabled');
+        } else if (currentPermission === 'denied') {
+          toast.error('Enable alerts in browser settings');
+        } else if (currentPermission === 'unsupported') {
+          toast.error('Browser notifications are not supported here');
+        }
+      }
+
+      return currentPermission;
+    } catch {
+      const permission = window.Notification.permission;
+      setNotificationPermission(permission);
+      if (showToast) toast.error('Browser alerts were not enabled');
+      return permission;
+    }
+  };
+
+  const showBrowserNotification = (title, options = {}, path) => {
+    if (!supportsBrowserNotifications()) return;
+    if (window.Notification.permission !== 'granted') return;
+
+    try {
+      const browserNotification = new window.Notification(title || 'BloodLink alert', {
+        body: options.body,
+        tag: options.tag,
+        requireInteraction: options.requireInteraction,
+        icon: '/favicon.svg',
+      });
+
+      browserNotification.onclick = () => {
+        window.focus();
+        browserNotification.close();
+        if (path) navigate(path);
+      };
+    } catch {
+      // Keep realtime UI alerts working even if the OS notification API rejects.
     }
   };
 
@@ -128,13 +188,29 @@ export const SocketProvider = ({ children }) => {
   }, [isAuthenticated, user?.role, updateUser]);
 
   useEffect(() => {
-    if (!socket) return undefined;
+    const userId = user?._id || user?.id;
+    if (!isAuthenticated || user?.role !== 'donor' || !userId) return;
+    if (pushRegisteredForUser.current === userId) return;
 
-    socket.on('blood-request:new', (notification) => {
+    pushRegisteredForUser.current = userId;
+    requestNotificationPermission({ showToast: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, user?._id, user?.id, user?.role]);
+
+  useEffect(() => {
+    if (!socket) return undefined;
+    if (socket.disconnected) socket.connect();
+
+    const handleBloodRequestNew = (notification) => {
       if (!notification) return;
       if (user?.role === 'donor' && !notification.data?.closed) {
         setActiveSos(notification);
         startAlarm(notification);
+        showBrowserNotification(notification.title || 'Emergency blood request', {
+          body: notification.message,
+          tag: `blood-request-${notification.data?.requestId || Date.now()}`,
+          requireInteraction: true,
+        }, '/donor/notifications');
       }
 
       toast.custom((t) => (
@@ -150,9 +226,9 @@ export const SocketProvider = ({ children }) => {
           </div>
         </div>
       ), { duration: 10000 });
-    });
+    };
 
-    socket.on('blood-request:closed', (payload = {}) => {
+    const handleBloodRequestClosed = (payload = {}) => {
       setActiveSos((current) => {
         if (String(current?.data?.requestId) === String(payload.requestId)) {
           stopAlarm();
@@ -161,15 +237,29 @@ export const SocketProvider = ({ children }) => {
         return current;
       });
       toast.success(payload.message || 'This request was accepted by another donor.');
-    });
+      showBrowserNotification('Blood request covered', {
+        body: payload.message || 'This request was accepted by another donor.',
+        tag: `blood-request-closed-${payload.requestId || Date.now()}`,
+      }, '/donor/notifications');
+    };
 
-    socket.on('blood-request:response', (notification = {}) => {
+    const handleBloodRequestResponse = (notification = {}) => {
       toast.success(notification.message || 'A donor responded to your request.');
-    });
+      showBrowserNotification(notification.title || 'Donor response', {
+        body: notification.message || 'A donor responded to your request.',
+        tag: `blood-request-response-${notification.data?.requestId || Date.now()}`,
+        requireInteraction: true,
+      }, user?.role === 'hospital' ? '/hospital/notifications' : '/donor/notifications');
+    };
 
-    socket.on('chat:ready', ({ requestId } = {}) => {
+    const handleChatReady = ({ requestId } = {}) => {
       if (!requestId) return;
       const base = user?.role === 'hospital' ? '/hospital/chat' : '/donor/chat';
+      showBrowserNotification('BloodLink chat ready', {
+        body: 'A donor accepted. You can open the request chat now.',
+        tag: `chat-ready-${requestId}`,
+        requireInteraction: true,
+      }, `${base}/${requestId}`);
       toast.custom((t) => (
         <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} alert-toast`}>
           <div>
@@ -190,36 +280,72 @@ export const SocketProvider = ({ children }) => {
         </div>
       ), { duration: 10000 });
       window.dispatchEvent(new CustomEvent('bloodlink:chat-ready', { detail: { requestId, base } }));
-    });
+    };
 
-    socket.on('chat:unread', ({ message } = {}) => {
+    const handleChatUnread = ({ message } = {}) => {
       toast(message?.message || 'New chat message');
-    });
+      showBrowserNotification('New chat message', {
+        body: message?.message || 'New chat message',
+        tag: `chat-unread-${message?._id || Date.now()}`,
+      });
+    };
 
-    socket.on('donation:recorded', ({ pointsAwarded, totalDonations, badges, certificateId } = {}) => {
+    const handleDonationRecorded = ({ pointsAwarded, totalDonations, badges, certificateId } = {}) => {
       const badgeText = badges?.length ? ` Badges: ${badges.join(', ')}.` : '';
       toast.success(
         `Donation recorded! +${pointsAwarded || 0} points. Total donations: ${totalDonations || 0}.${badgeText}${certificateId ? ` Certificate: ${certificateId}` : ''}`,
         { duration: 8000 },
       );
       window.dispatchEvent(new CustomEvent('bloodlink:donation-recorded'));
-    });
+    };
 
-    socket.on('eligibility:deferred', ({ deferralUntil } = {}) => {
+    const handleEligibilityDeferred = ({ deferralUntil } = {}) => {
       if (!deferralUntil) return;
       toast.success(`Donation completed. Eligible again after ${new Date(deferralUntil).toLocaleDateString()}.`);
       window.dispatchEvent(new CustomEvent('bloodlink:eligibility-deferred'));
-    });
+    };
+
+    socket.on('blood-request:new', handleBloodRequestNew);
+    socket.on('blood-request:closed', handleBloodRequestClosed);
+    socket.on('blood-request:response', handleBloodRequestResponse);
+    socket.on('chat:ready', handleChatReady);
+    socket.on('chat:unread', handleChatUnread);
+    socket.on('donation:recorded', handleDonationRecorded);
+    socket.on('eligibility:deferred', handleEligibilityDeferred);
 
     return () => {
       stopAlarm();
-      socket.disconnect();
+      socket.off('blood-request:new', handleBloodRequestNew);
+      socket.off('blood-request:closed', handleBloodRequestClosed);
+      socket.off('blood-request:response', handleBloodRequestResponse);
+      socket.off('chat:ready', handleChatReady);
+      socket.off('chat:unread', handleChatUnread);
+      socket.off('donation:recorded', handleDonationRecorded);
+      socket.off('eligibility:deferred', handleEligibilityDeferred);
     };
     // startAlarm/stopAlarm are local helpers that intentionally operate on refs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [socket, user?.role]);
 
-  const value = useMemo(() => ({ socket }), [socket]);
+  useEffect(() => {
+    if (!socket) return undefined;
+    const handleConnectError = (err) => {
+      toast.error(err?.message ? `Realtime alert connection failed: ${err.message}` : 'Realtime alert connection failed');
+    };
+
+    if (socket.disconnected) socket.connect();
+    socket.on('connect_error', handleConnectError);
+
+    return () => {
+      socket.off('connect_error', handleConnectError);
+      socket.disconnect();
+    };
+  }, [socket]);
+
+  const value = useMemo(
+    () => ({ socket, notificationPermission, requestNotificationPermission }),
+    [socket, notificationPermission],
+  );
 
   return (
     <SocketContext.Provider value={value}>

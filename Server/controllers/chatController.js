@@ -75,6 +75,13 @@ exports.sendMessage = async (req, res) => {
       });
     }
 
+    if (["fulfilled", "cancelled"].includes(request.status)) {
+      return res.status(400).json({
+        success: false,
+        message: "This chat is closed because the request is complete",
+      });
+    }
+
     conversation.messages.push({
       sender: req.user._id,
       message,

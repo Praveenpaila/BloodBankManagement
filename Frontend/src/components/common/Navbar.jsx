@@ -1,4 +1,4 @@
-import { Bell, ChevronDown, Droplet, LogOut, Menu, Settings, User } from 'lucide-react';
+import { Bell, BellRing, Check, ChevronDown, Droplet, LogOut, Menu, Settings, User } from 'lucide-react';
 import { Link, NavLink } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../context/authStore';
@@ -14,8 +14,8 @@ const publicLinks = [
 ];
 
 const roleLinks = {
-  donor: [['Dashboard', '/donor/dashboard'], ['Requests', '/donor/nearby-requests'], ['Find Blood', '/donor/blood-finder'], ['SOS', '/donor/sos']],
-  hospital: [['Dashboard', '/hospital/dashboard'], ['Inventory', '/hospital/inventory'], ['Find Blood', '/hospital/blood-finder']],
+  donor: [['Dashboard', '/donor/dashboard'], ['Chats', '/donor/chats'], ['Requests', '/donor/nearby-requests'], ['Find Blood', '/donor/blood-finder'], ['SOS', '/donor/sos']],
+  hospital: [['Dashboard', '/hospital/dashboard'], ['Chats', '/hospital/chats'], ['Inventory', '/hospital/inventory'], ['Find Blood', '/hospital/blood-finder']],
   admin: [['Dashboard', '/admin/dashboard'], ['Users', '/admin/users']],
 };
 
@@ -24,7 +24,7 @@ const profilePath = (role) => (role === 'hospital' ? '/hospital/profile' : role 
 
 const Navbar = () => {
   const { user, isAuthenticated, logout } = useAuth();
-  const { socket } = useSocket();
+  const { socket, notificationPermission, requestNotificationPermission } = useSocket();
   const [open, setOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [unread, setUnread] = useState(0);
@@ -71,6 +71,7 @@ const Navbar = () => {
   const links = isAuthenticated ? roleLinks[user?.role] || [] : publicLinks;
   const mobileLinks = isAuthenticated ? sidebarItems[user?.role] || [] : publicLinks.map(([label, path]) => [label, null, path]);
   const name = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.hospitalName || user?.email || 'Profile';
+  const showAlertControl = isAuthenticated && user?.role === 'donor';
 
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
@@ -93,6 +94,28 @@ const Navbar = () => {
         <div className="hidden items-center gap-3 md:ml-8 md:flex">
           {isAuthenticated ? (
             <>
+              {showAlertControl && notificationPermission === 'default' && (
+                <button
+                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                  type="button"
+                  aria-label="Enable browser alerts"
+                  title="Enable browser alerts"
+                  onClick={requestNotificationPermission}
+                >
+                  <BellRing size={18} />
+                  <span>Enable Alerts</span>
+                </button>
+              )}
+              {showAlertControl && notificationPermission === 'granted' && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700">
+                  <Check size={16} /> Alerts Enabled
+                </span>
+              )}
+              {showAlertControl && notificationPermission === 'denied' && (
+                <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-700">
+                  Enable in browser settings
+                </span>
+              )}
               <Link className="relative rounded-full border border-slate-200 p-2 hover:bg-slate-50" to={`/${user.role}/notifications`}>
                 <Bell size={18} />
                 {unread > 0 && (
@@ -144,6 +167,17 @@ const Navbar = () => {
             ))}
             {isAuthenticated ? (
               <>
+                {showAlertControl && notificationPermission === 'default' && (
+                  <button className="btn-outline" type="button" onClick={requestNotificationPermission}>
+                    <BellRing size={16} /> Enable Alerts
+                  </button>
+                )}
+                {showAlertControl && notificationPermission === 'granted' && (
+                  <span className="btn-outline text-emerald-700"><Check size={16} /> Alerts Enabled</span>
+                )}
+                {showAlertControl && notificationPermission === 'denied' && (
+                  <span className="btn-outline text-amber-700">Enable in browser settings</span>
+                )}
                 <Link className="btn-outline" to={profilePath(user?.role)} onClick={() => setOpen(false)}>
                   <User size={16} /> {name}
                 </Link>

@@ -2,9 +2,11 @@ const axios = require("axios");
 const BloodRequest = require("../models/BloodRequest");
 const UserModel = require("../models/user");
 const Notification = require("../models/Notification");
+const PushSubscription = require("../models/PushSubscription");
 const ChatConversation = require("../models/ChatConversation");
 const { transporter } = require("./auth");
-const { emitToUser } = require("../utils/realtime");
+const { emitToRequest, emitToUser } = require("../utils/realtime");
+const { sendPushNotification } = require("../utils/webPush");
 const { recordCompletedDonation } = require("../utils/recordDonation");
 const { rankDonorsByShortestPath } = require("../utils/geoRouting");
 const { haversineKm, roundKm } = require("../utils/haversine");
@@ -157,6 +159,40 @@ exports.createRequest = async (req, res) => {
     notifications.forEach((notification) => {
       if (notification?.recipient) emitToUser(notification.recipient, "blood-request:new", notification);
     });
+
+    if (process.env.VAPID_PUBLIC_KEY) {
+      const donorIds = rankedDonors.map(({ donor }) => donor._id);
+      const distanceByDonor = new Map(
+        rankedDonors.map(({ donor }) => [
+          String(donor._id),
+          roundKm(haversineKm(coordinates, donor.location.coordinates)),
+        ]),
+      );
+
+      PushSubscription.find({ user: { $in: donorIds } })
+        .then((subscriptions) =>
+          Promise.all(
+            subscriptions.map(async (pushSubscription) => {
+              try {
+                const distanceKm = distanceByDonor.get(String(pushSubscription.user)) ?? "N/A";
+                await sendPushNotification(pushSubscription.subscription, {
+                  title: `🩸 ${urgency === "critical" ? "SOS: " : ""}${bloodGroup} blood needed`,
+                  body: `${distanceKm} km from you. Tap to respond.`,
+                  url: "/donor/notifications",
+                  urgency,
+                  bloodGroup,
+                  requestId: String(request._id),
+                });
+              } catch (err) {
+                if (err?.expired) {
+                  await PushSubscription.deleteOne({ _id: pushSubscription._id });
+                }
+              }
+            }),
+          ),
+        )
+        .catch(() => {});
+    }
 
     for (const { donor, routing } of rankedDonors) {
       if (donor.email && (process.env.EMAIL_USER || process.env.SMTP_USER)) {
@@ -488,6 +524,20 @@ exports.updateRequestStatus = async (req, res) => {
       });
     }
 
+    if (["fulfilled", "cancelled"].includes(status)) {
+      const statusPayload = {
+        requestId: request._id,
+        status,
+        message:
+          status === "fulfilled"
+            ? "Donation completed. The request chat is now closed."
+            : "This request was cancelled. The request chat is now closed.",
+      };
+      emitToRequest(request._id, `blood-request:${status}`, statusPayload);
+      if (request.acceptedDonor) emitToUser(request.acceptedDonor, `blood-request:${status}`, statusPayload);
+      emitToUser(request.requestedBy, `blood-request:${status}`, statusPayload);
+    }
+
     return res.status(200).json({
       success: true,
       data: request,
@@ -537,6 +587,15 @@ exports.completeDonationForRequest = async (req, res) => {
     request.status = "fulfilled";
     request.fulfilledAt = new Date();
     await request.save();
+
+    const completionPayload = {
+      requestId: request._id,
+      status: request.status,
+      message: "Donation completed. The request chat is now closed.",
+    };
+    emitToRequest(request._id, "blood-request:fulfilled", completionPayload);
+    emitToUser(request.acceptedDonor, "blood-request:fulfilled", completionPayload);
+    emitToUser(request.requestedBy, "blood-request:fulfilled", completionPayload);
 
     const { donation, deferralUntil, loyalty } = donationResult;
 
