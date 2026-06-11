@@ -1,6 +1,7 @@
 const ChatConversation = require("../models/ChatConversation");
 const BloodRequest = require("../models/BloodRequest");
 const { emitToRequest, emitToUser } = require("../utils/realtime");
+const { sendExpoPushToUsers } = require("../utils/expoPush");
 
 const canAccess = (conversation, userId) =>
   String(conversation.requester?._id || conversation.requester) === String(userId) ||
@@ -106,6 +107,16 @@ exports.sendMessage = async (req, res) => {
     emitToUser(recipient, "chat:unread", {
       requestId: req.params.requestId,
       message: sent,
+    });
+
+    // Expo push for new chat message
+    const senderName = `${req.user.firstName || ""} ${req.user.lastName || ""}`.trim() || "Someone";
+    sendExpoPushToUsers([recipient], {
+      title: `New message from ${senderName}`,
+      body: message.length > 80 ? message.slice(0, 80) + "\u2026" : message,
+      data: { screen: `chat:${req.params.requestId}` },
+      channelId: "bloodlink-default",
+      priority: "high",
     });
 
     return res.status(201).json({

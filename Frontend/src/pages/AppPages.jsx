@@ -269,10 +269,10 @@ export const DonorDashboard = () => {
   }, [socket]);
 
   return (
-    <DashboardLayout title={`Welcome back, ${user?.firstName || 'Donor'}`} subtitle="Your donation activity, eligibility and recent alerts.">
-      {loading ? <SmallSpinner /> : (
+    <DashboardLayout title={`Welcome back, ${user?.firstName || 'Donor'}`} subtitle="Your donation activity, eligibility and recent alerts." loading={loading}>
+      {data && (
         <div className="space-y-5">
-          {data.eligibility?.deferralUntil && <div className="card border-amber-200 bg-amber-50 text-amber-800">You are deferred for 30 days after your last donation.</div>}
+          {data?.eligibility?.deferralUntil && <div className="card border-amber-200 bg-amber-50 text-amber-800">You are deferred for 30 days after your last donation.</div>}
           <div className="card flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-xl font-black">{user?.firstName} {user?.lastName}</h2>
@@ -281,16 +281,16 @@ export const DonorDashboard = () => {
             <BloodGroupBadge group={user?.bloodGroup} size="lg" />
           </div>
           <div className="page-grid">
-            <StatCard label="Total Donations" value={data.stats.totalDonations} />
-            <StatCard label="Points" value={data.stats.points} />
-            <StatCard label="Badges Earned" value={`${data.stats.badges?.length || 0}/6`} />
-            <StatCard label="Next Eligible Date" value={data.eligibility?.deferralUntil ? fmtDate(data.eligibility.deferralUntil) : 'Now'} />
+            <StatCard label="Total Donations" value={data?.stats?.totalDonations} />
+            <StatCard label="Points" value={data?.stats?.points} />
+            <StatCard label="Badges Earned" value={`${data?.stats?.badges?.length || 0}/6`} />
+            <StatCard label="Next Eligible Date" value={data?.eligibility?.deferralUntil ? fmtDate(data?.eligibility?.deferralUntil) : 'Now'} />
           </div>
           <div className="grid gap-5 lg:grid-cols-2">
             <div className={`card ${status === 'eligible' ? 'border-green-200 bg-green-50' : status === 'not checked' ? 'border-red-200 bg-red-50' : 'border-amber-200 bg-amber-50'}`}>
               <h3 className="text-lg font-black">Eligibility</h3>
               <p className="mt-2 capitalize">{status.replaceAll('_', ' ')}</p>
-              {data.eligibility?.deferralReason && <p className="mt-1 text-sm">{data.eligibility.deferralReason}</p>}
+              {data?.eligibility?.deferralReason && <p className="mt-1 text-sm">{data?.eligibility?.deferralReason}</p>}
               <Link className="btn-primary mt-4" to="/donor/eligibility"><Stethoscope size={16} /> Check Eligibility</Link>
             </div>
             <div className="card">
@@ -303,19 +303,19 @@ export const DonorDashboard = () => {
             </div>
           </div>
           <div className="grid gap-5 lg:grid-cols-2">
-            <PageTable headers={['Date', 'Hospital', 'Blood Group', 'Type']} rows={data.donations.slice(0, 5).map((item) => (
+            <PageTable headers={['Date', 'Hospital', 'Blood Group', 'Type']} rows={(data?.donations || []).slice(0, 5).map((item) => (
               <tr key={item._id}><td>{fmtDate(item.donationDate)}</td><td>{item.hospital?.hospitalName || item.hospital?.firstName}</td><td><BloodGroupBadge group={item.bloodGroup} size="sm" /></td><td>{item.source === 'sos' ? 'SOS' : item.source === 'appointment' ? 'Appointment' : 'Regular'}</td></tr>
             ))} />
             <div className="card">
               <h3 className="text-lg font-black">Recent Notifications</h3>
               <div className="mt-3 space-y-3">
-                {data.notifications.slice(0, 3).map((item) => (
+                {(data?.notifications || []).slice(0, 3).map((item) => (
                   <div key={item._id} className="rounded-lg border border-slate-200 p-3">
                     <p className="font-black">{item.title}</p>
                     <p className="text-sm text-slate-500">{item.message}</p>
                   </div>
                 ))}
-                {data.notifications.length === 0 && <Empty title="No alerts" text="You're all caught up." />}
+                {(data?.notifications || []).length === 0 && <Empty title="No alerts" text="You're all caught up." />}
               </div>
             </div>
           </div>
@@ -328,15 +328,19 @@ export const DonorDashboard = () => {
 export const DonorProfile = () => {
   const { user, updateUser } = useAuth();
   const [form, setForm] = useState({ firstName: user?.firstName || '', lastName: user?.lastName || '', phoneNumber: user?.phoneNumber || '', city: user?.city || '', bloodGroup: user?.bloodGroup || 'O+' });
+  const [loading, setLoading] = useState(false);
 
   const save = async (event) => {
     event.preventDefault();
+    setLoading(true);
     try {
       const { data } = await api.put('/auth/me', form);
       updateUser(data.data);
       toast.success('Profile updated');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Profile update failed');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -353,7 +357,7 @@ export const DonorProfile = () => {
   };
 
   return (
-    <DashboardLayout title="My Profile">
+    <DashboardLayout title="My Profile" loading={loading}>
       <form className="card grid gap-4 md:grid-cols-2" onSubmit={save}>
         {['firstName', 'lastName', 'phoneNumber', 'city'].map((field) => (
           <Field key={field} label={field}><input className="input-field" value={form[field]} onChange={(e) => setForm({ ...form, [field]: e.target.value })} required /></Field>
@@ -381,7 +385,7 @@ export const EligibilityPage = () => {
   const { socket } = useSocket();
   const [step, setStep] = useState(1);
   const [result, setResult] = useState(null);
-  const { data: previous, reload } = useApi(async () => (await api.get('/eligibility/status')).data.data, []);
+  const { data: previous, reload, loading } = useApi(async () => (await api.get('/eligibility/status')).data.data, []);
   const [form, setForm] = useState({
     age: user?.age || '',
     weight: '',
@@ -416,7 +420,7 @@ export const EligibilityPage = () => {
   }, [socket]);
 
   return (
-    <DashboardLayout title="Eligibility Check" subtitle={`Step ${step}/4`}>
+    <DashboardLayout title="Eligibility Check" subtitle={`Step ${step}/4`} loading={loading}>
       {previous?.deferralUntil && <div className="card mb-5 border-amber-200 bg-amber-50 text-amber-800">You are deferred for 30 days after your last donation.</div>}
       {previous && <div className="status-strip mb-5"><p className="font-black">Previous result: <span className="capitalize">{(previous.status || previous.record?.status || '').replaceAll('_', ' ')}</span></p></div>}
       <div className="eligibility-card">
@@ -467,7 +471,7 @@ const ToggleGrid = ({ items, form, update }) => (
 );
 
 export const BookAppointment = () => {
-  const { data } = useApi(async () => {
+  const { data, loading } = useApi(async () => {
     const [eligibility, hospitals, history] = await Promise.all([api.get('/eligibility/status'), api.get('/hospitals/list'), api.get('/donations/my-history')]);
     return { eligibility: eligibility.data.data, hospitals: hospitals.data.data, history: history.data.data };
   }, []);
@@ -515,7 +519,7 @@ export const BookAppointment = () => {
   };
 
   return (
-    <DashboardLayout title="Book Appointment">
+    <DashboardLayout title="Book Appointment" loading={loading}>
       {!eligible ? <div className="card border-amber-200 bg-amber-50">Complete an eligible check before booking. <Link className="font-black text-[#C0392B]" to="/donor/eligibility">Check now</Link></div> : (
         <div className="card space-y-4">
           {confirmation && (
@@ -629,10 +633,10 @@ export const DonationHistory = () => {
   const months = new Set(donations.map((item) => format(new Date(item.donationDate), 'yyyy-MM')));
 
   return (
-    <DashboardLayout title="Donation History">
-      {loading ? <SmallSpinner /> : (
+    <DashboardLayout title="Donation History" loading={loading}>
+      {data && (
         <div className="space-y-5">
-          <div className="page-grid"><StatCard label="Total Donations" value={data.totalDonations} /><StatCard label="Lives Impacted" value={data.totalDonations * 3} /><StatCard label="Donation Streak" value={`${months.size} months`} /></div>
+          <div className="page-grid"><StatCard label="Total Donations" value={data.totalDonations} /><StatCard label="Lives Impacted" value={(data.totalDonations || 0) * 3} /><StatCard label="Donation Streak" value={`${months.size} months`} /></div>
           {donations.length === 0 ? (
             <div className="empty-state">
               <Droplet size={34} />
@@ -676,13 +680,13 @@ export const BadgesPage = () => {
   const allBadges = ['First Drop', 'Life Saver', 'Blood Hero', 'Rare Type', 'Monthly Champion', 'Emergency Responder'];
 
   return (
-    <DashboardLayout title="Badges & Points">
-      {loading ? <SmallSpinner /> : (
+    <DashboardLayout title="Badges & Points" loading={loading}>
+      {data && (
         <div className="space-y-5">
-          <div className="card"><p className="text-sm font-bold text-slate-500">Points Balance</p><p className="text-5xl font-black text-[#C0392B]">{data.stats.points}</p><div className="mt-4 h-2 rounded-full bg-slate-100"><div className="h-2 rounded-full bg-[#C0392B]" style={{ width: `${Math.min((data.stats.points % 1000) / 10, 100)}%` }} /></div></div>
-          <div className="grid gap-4 md:grid-cols-3">{allBadges.map((badge) => <div key={badge} className={`card ${data.stats.badges?.includes(badge) ? 'border-green-200 bg-green-50' : 'grayscale'}`}><h3 className="font-black">{badge}</h3><p className="mt-2 text-sm">{data.stats.badges?.includes(badge) ? 'EARNED' : 'Locked'}</p></div>)}</div>
-          <PageTable headers={['Action', 'Points', 'Date']} rows={data.stats.records.map((item) => <tr key={item._id}><td>{item.action}</td><td>{item.points}</td><td>{fmtDate(item.createdAt)}</td></tr>)} />
-          <PageTable headers={['Rank', 'Name', 'Blood', 'Points']} rows={data.leaderboard.map((item, index) => <tr key={item._id} className={item._id === user?._id ? 'bg-red-50' : ''}><td>{index + 1}</td><td>{item.firstName} {item.lastName}</td><td><BloodGroupBadge group={item.bloodGroup} size="sm" /></td><td>{item.points}</td></tr>)} />
+          <div className="card"><p className="text-sm font-bold text-slate-500">Points Balance</p><p className="text-5xl font-black text-[#C0392B]">{data.stats?.points || 0}</p><div className="mt-4 h-2 rounded-full bg-slate-100"><div className="h-2 rounded-full bg-[#C0392B]" style={{ width: `${Math.min(((data.stats?.points || 0) % 1000) / 10, 100)}%` }} /></div></div>
+          <div className="grid gap-4 md:grid-cols-3">{allBadges.map((badge) => <div key={badge} className={`card ${data.stats?.badges?.includes(badge) ? 'border-green-200 bg-green-50' : 'grayscale'}`}><h3 className="font-black">{badge}</h3><p className="mt-2 text-sm">{data.stats?.badges?.includes(badge) ? 'EARNED' : 'Locked'}</p></div>)}</div>
+          <PageTable headers={['Action', 'Points', 'Date']} rows={(data.stats?.records || []).map((item) => <tr key={item._id}><td>{item.action}</td><td>{item.points}</td><td>{fmtDate(item.createdAt)}</td></tr>)} />
+          <PageTable headers={['Rank', 'Name', 'Blood', 'Points']} rows={(data.leaderboard || []).map((item, index) => <tr key={item._id} className={item._id === user?._id ? 'bg-red-50' : ''}><td>{index + 1}</td><td>{item.firstName} {item.lastName}</td><td><BloodGroupBadge group={item.bloodGroup} size="sm" /></td><td>{item.points}</td></tr>)} />
         </div>
       )}
     </DashboardLayout>
@@ -696,7 +700,7 @@ const NotificationsView = ({ title }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { socket } = useSocket();
-  const { data, reload: fetchNotifications, setData } = useApi(async () => (await api.get('/notifications')).data.data, []);
+  const { data, reload: fetchNotifications, setData, loading } = useApi(async () => (await api.get('/notifications')).data.data, []);
 
   useEffect(() => {
     if (!socket) return undefined;
@@ -755,7 +759,7 @@ const NotificationsView = ({ title }) => {
     fetchNotifications();
   };
   return (
-    <DashboardLayout title={title}>
+    <DashboardLayout title={title} loading={loading}>
       <div className="mb-4 flex flex-wrap gap-2">
         <button className="btn-outline" onClick={markAll}><CheckCircle size={16} /> Mark all read</button>
         <button className="btn-danger" onClick={clearAll}><Trash2 size={16} /> Clear All</button>
@@ -791,7 +795,7 @@ export const NearbyRequestsPage = () => {
   const navigate = useNavigate();
   const { user, updateUser } = useAuth();
   const coords = user?.location?.coordinates;
-  const { data, reload } = useApi(async () => {
+  const { data, reload, loading } = useApi(async () => {
     if (!coords?.length) return [];
     return (await api.get('/blood-requests/nearby', {
       params: { lat: coords[1], lng: coords[0] },
@@ -831,7 +835,7 @@ export const NearbyRequestsPage = () => {
   };
 
   return (
-    <DashboardLayout title="Nearby Requests">
+    <DashboardLayout title="Nearby Requests" loading={loading}>
       {!coords?.length ? <div className="empty-state"><MapPin size={34} /><h3>Location needed</h3><p>Enable your location to see nearby blood requests.</p><button className="btn-primary mt-4" onClick={enable}><LocateFixed size={16} /> Update Location</button></div> : (
         <div className="grid gap-5 lg:grid-cols-[3fr_2fr]">
           <div className="card min-h-96">{import.meta.env.VITE_GOOGLE_MAPS_API_KEY ? 'Map view is ready for configured Google Maps key.' : 'Google Maps API key is not set. Nearby requests are listed on the right.'}</div>
@@ -908,7 +912,7 @@ export const BloodFinder = () => {
   }, []);
 
   return (
-    <DashboardLayout title="Find Blood" subtitle="Search stock and eligible donors by blood group.">
+    <DashboardLayout title="Find Blood" subtitle="Search stock and eligible donors by blood group." loading={loading}>
       <div className="card mb-5 grid gap-3 md:grid-cols-[1fr_auto]">
         <Field label="Blood group">
           <select className="input-field" value={filters.bloodGroup} onChange={(e) => setFilters({ ...filters, bloodGroup: e.target.value })}>
@@ -962,14 +966,14 @@ const BloodFinderCard = ({ item, showUnits = false }) => (
 
 export const HospitalDashboard = () => {
   const { user } = useAuth();
-  const { data } = useApi(async () => {
+  const { data, loading } = useApi(async () => {
     const [inventory, requests, expiry] = await Promise.all([api.get('/inventory'), api.get('/blood-requests'), api.get('/inventory/expiry-alerts')]);
     return { inventory: inventory.data.data, requests: requests.data.data, expiry: expiry.data.data };
   }, []);
   const totals = BLOOD_GROUPS.map((group) => ({ group, units: (data?.inventory || []).filter((i) => i.bloodGroup === group).reduce((sum, i) => sum + i.units, 0) }));
   if (user?.isApproved === false) return <HospitalPendingApproval />;
   return (
-    <DashboardLayout title="Hospital Dashboard">
+    <DashboardLayout title="Hospital Dashboard" loading={loading}>
       {user?.isActive === false && <div className="card mb-5 border-red-200 bg-red-50 text-red-800">Your account has been suspended. Reason: {user.suspensionReason || 'No reason provided'}. Contact support.</div>}
       <div className="page-grid">{totals.map(({ group, units }) => <div key={group} className="card"><BloodGroupBadge group={group} /><p className={`mt-3 text-3xl font-black ${units < 5 ? 'text-red-700' : units <= 10 ? 'text-amber-700' : 'text-green-700'}`}>{units}</p><div className="mt-2 h-2 rounded-full bg-slate-100"><div className="h-2 rounded-full bg-[#C0392B]" style={{ width: `${Math.min(units * 5, 100)}%` }} /></div></div>)}</div>
       <div className="page-grid mt-5"><StatCard label="Open Requests" value={(data?.requests || []).filter((r) => r.status === 'open').length} /><StatCard label="Fulfilled Today" value={(data?.requests || []).filter((r) => r.status === 'fulfilled').length} /><StatCard label="Expiry Alerts" value={(data?.expiry || []).length} /></div>
@@ -978,7 +982,7 @@ export const HospitalDashboard = () => {
 };
 
 export const BloodInventory = () => {
-  const { data, reload } = useApi(async () => (await api.get('/inventory')).data.data, []);
+  const { data, reload, loading } = useApi(async () => (await api.get('/inventory')).data.data, []);
   const [form, setForm] = useState({ bloodGroup: 'O+', units: 1, expiryDate: '' });
   const save = async () => {
     try {
@@ -995,7 +999,7 @@ export const BloodInventory = () => {
     reload();
   };
   return (
-    <DashboardLayout title="Blood Inventory">
+    <DashboardLayout title="Blood Inventory" loading={loading}>
       <div className="card mb-5 grid gap-3 md:grid-cols-4"><select className="input-field" value={form.bloodGroup} onChange={(e) => setForm({ ...form, bloodGroup: e.target.value })}>{BLOOD_GROUPS.map((group) => <option key={group}>{group}</option>)}</select><input className="input-field" type="number" value={form.units} onChange={(e) => setForm({ ...form, units: e.target.value })} /><input className="input-field" type="date" value={form.expiryDate} onChange={(e) => setForm({ ...form, expiryDate: e.target.value })} /><button className="btn-primary" onClick={save}><Plus size={16} /> Add Stock</button></div>
       <button className="btn-outline mb-4" onClick={() => exportCsv('inventory.csv', [['Blood Group', 'Units', 'Expiry'], ...(data || []).map((i) => [i.bloodGroup, i.units, fmtDate(i.expiryDate)])])}><Download size={16} /> Export CSV</button>
       <PageTable headers={['Blood Group', 'Units', 'Expiry Date', 'Status', 'Actions']} rows={(data || []).map((item) => <tr key={item._id} className={item.units < 5 ? 'bg-red-50' : item.units <= 10 ? 'bg-amber-50' : ''}><td><BloodGroupBadge group={item.bloodGroup} size="sm" /></td><td>{item.units}</td><td>{fmtDate(item.expiryDate)}</td><td><span className={`badge-pill ${item.units < 5 ? 'bg-red-50 text-red-700' : item.units <= 10 ? 'bg-amber-50 text-amber-700' : 'bg-green-50 text-green-700'}`}>{item.units < 5 ? 'Critical' : item.units <= 10 ? 'Warning' : 'Safe'}</span></td><td><button className="btn-outline" onClick={() => del(item._id)}><Trash2 size={16} /> Delete</button></td></tr>)} />
@@ -1011,7 +1015,7 @@ export const RaiseRequest = () => {
   const [activeRequest, setActiveRequest] = useState(null);
   const coords = user?.location?.coordinates;
   const hasLocation = coords?.length >= 2;
-  const { data: count, reload } = useApi(async () => {
+  const { data: count, reload, loading } = useApi(async () => {
     if (!hasLocation) return 0;
     const response = await api.get('/donors/count', {
       params: {
@@ -1134,7 +1138,7 @@ export const RaiseRequest = () => {
   };
 
   return (
-    <DashboardLayout title={isDonorSos ? 'Emergency Blood SOS' : 'Raise Blood Request'} subtitle="Dispatch an urgent donor alert and connect with the first accepting donor.">
+    <DashboardLayout title={isDonorSos ? 'Emergency Blood SOS' : 'Raise Blood Request'} subtitle="Dispatch an urgent donor alert and connect with the first accepting donor." loading={loading || requestingLocation}>
       {!hasLocation && (
         <div className="card mb-5 border-amber-200 bg-amber-50">
           <p className="font-black text-amber-800">Location is required to alert nearby donors.</p>
@@ -1182,7 +1186,7 @@ export const ConversationsPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { socket } = useSocket();
-  const { data, reload } = useApi(async () => (await api.get('/chats')).data.data, []);
+  const { data, reload, loading } = useApi(async () => (await api.get('/chats')).data.data, []);
 
   useEffect(() => {
     if (!socket) return undefined;
@@ -1205,7 +1209,7 @@ export const ConversationsPage = () => {
   const ordered = [...active, ...closed];
 
   return (
-    <DashboardLayout title="Chats" subtitle="Accepted request chats stay here until the donation is completed.">
+    <DashboardLayout title="Chats" subtitle="Accepted request chats stay here until the donation is completed." loading={loading}>
       <div className="space-y-3">
         {ordered.map((item) => {
           const requesterId = item.requester?._id || item.requester;
@@ -1242,16 +1246,20 @@ export const ChatPage = () => {
   const { user } = useAuth();
   const { socket } = useSocket();
   const [conversation, setConversation] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [completing, setCompleting] = useState(false);
   const [resetting, setResetting] = useState(false);
 
   const load = async () => {
+    setLoading(true);
     try {
       const { data } = await api.get(`/chats/${requestId}`);
       setConversation(data.data);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Chat is not available yet');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -1351,8 +1359,8 @@ export const ChatPage = () => {
   };
 
   return (
-    <DashboardLayout title="Request Chat" subtitle={conversation ? `${conversation.request?.bloodGroup} blood, ${conversation.request?.unitsNeeded} unit(s)` : 'Connecting donor and requester'}>
-      {!conversation ? <SmallSpinner /> : (
+    <DashboardLayout title="Request Chat" subtitle={conversation ? `${conversation.request?.bloodGroup} blood, ${conversation.request?.unitsNeeded} unit(s)` : 'Connecting donor and requester'} loading={loading}>
+      {conversation && (
         <div className="chat-shell">
           <aside className="chat-side">
             <BloodGroupBadge group={conversation.request?.bloodGroup} size="lg" />
@@ -1397,7 +1405,7 @@ const RequestsList = ({ admin = false }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const endpoint = admin ? '/admin/requests' : '/blood-requests';
-  const { data, reload } = useApi(async () => (await api.get(endpoint)).data, []);
+  const { data, reload, loading } = useApi(async () => (await api.get(endpoint)).data, []);
   const rows = admin ? data?.data || [] : data?.data || [];
   const setStatus = async (id, status) => {
     if (status === 'fulfilled') {
@@ -1410,7 +1418,7 @@ const RequestsList = ({ admin = false }) => {
     reload();
   };
   return (
-    <DashboardLayout title={admin ? 'Requests Log' : 'Request Status'}>
+    <DashboardLayout title={admin ? 'Requests Log' : 'Request Status'} loading={loading}>
       <PageTable headers={['Hospital', 'Blood', 'Units', 'Urgency', 'Status', 'Notified', 'Date', 'Actions']} rows={rows.filter(Boolean).map((item, index) => {
         const acceptedDonor = item.acceptedDonor || item.respondingDonors?.find((entry) => entry.action === 'accept')?.donor;
         const canOpenChat = Boolean(!admin && item._id && acceptedDonor);
@@ -1433,12 +1441,20 @@ export const HospitalPendingApproval = () => (
 export const DonorSearch = () => {
   const [query, setQuery] = useState({ bloodGroup: '', city: '' });
   const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(false);
   const search = async () => {
-    const { data } = await api.get('/donors/search', { params: query });
-    setResults(data.data);
+    setLoading(true);
+    try {
+      const { data } = await api.get('/donors/search', { params: query });
+      setResults(data.data);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Search failed');
+    } finally {
+      setLoading(false);
+    }
   };
   return (
-    <DashboardLayout title="Donor Search">
+    <DashboardLayout title="Donor Search" loading={loading}>
       <div className="card mb-5 grid gap-3 md:grid-cols-3"><select className="input-field" value={query.bloodGroup} onChange={(e) => setQuery({ ...query, bloodGroup: e.target.value })}><option value="">Any blood group</option>{BLOOD_GROUPS.map((g) => <option key={g}>{g}</option>)}</select><input className="input-field" placeholder="City" value={query.city} onChange={(e) => setQuery({ ...query, city: e.target.value })} /><button className="btn-primary" onClick={search}><SearchIcon size={16} /> Search</button></div>
       <div className="page-grid">{results.map((item) => <div className="card" key={item._id}><h3 className="font-black">{item.firstName}</h3><BloodGroupBadge group={item.bloodGroup} /><p className="mt-2 text-sm">{item.city}</p><button className="btn-outline mt-3" onClick={() => toast.success('Direct notification ready')}><Droplet size={16} /> Request This Donor</button></div>)}{results.length === 0 && <Empty title="No donors found" text="Search by blood group and city to find eligible donors." />}</div>
     </DashboardLayout>
@@ -1446,7 +1462,7 @@ export const DonorSearch = () => {
 };
 
 export const HospitalAppointments = () => {
-  const { data, reload } = useApi(async () => (await api.get('/appointments')).data.data, []);
+  const { data, reload, loading } = useApi(async () => (await api.get('/appointments')).data.data, []);
   const complete = async (id) => {
     try {
       const { data: response } = await api.put(`/appointments/${id}/complete`);
@@ -1462,7 +1478,7 @@ export const HospitalAppointments = () => {
     }
   };
   return (
-    <DashboardLayout title="Appointments">
+    <DashboardLayout title="Appointments" loading={loading}>
       <PageTable
         headers={['Donor', 'Blood', 'Date', 'Slot', 'Status', 'Actions']}
         rows={(data || []).map((item) => (
@@ -1488,12 +1504,12 @@ export const HospitalAppointments = () => {
 };
 
 export const ExpiryAlerts = () => {
-  const { data, reload } = useApi(async () => (await api.get('/inventory/expiry-alerts')).data.data, []);
+  const { data, reload, loading } = useApi(async () => (await api.get('/inventory/expiry-alerts')).data.data, []);
   const del = async (id) => { await api.delete(`/inventory/${id}`); toast.success('Stock removed'); reload(); };
   const [weekCutoff] = useState(() => new Date(Date.now() + 7 * 86400000));
   const week = (data || []).filter((item) => new Date(item.expiryDate) <= weekCutoff).length;
   return (
-    <DashboardLayout title="Expiry Alerts">
+    <DashboardLayout title="Expiry Alerts" loading={loading}>
       <div className="card mb-5"><p className="text-xl font-black">{week} units expiring this week</p></div>
       <PageTable headers={['Blood Group', 'Units', 'Expiry Date', 'Days Left', 'Actions']} rows={(data || []).map((item) => {
         const days = Math.ceil((new Date(item.expiryDate) - new Date()) / 86400000);
@@ -1513,20 +1529,24 @@ export const HospitalProfile = () => {
     phoneNumber: user?.phoneNumber || '',
     licenseNumber: user?.licenseNumber || user?.registrationNumber || '',
   });
+  const [loading, setLoading] = useState(false);
 
   const save = async (event) => {
     event.preventDefault();
+    setLoading(true);
     try {
       const { data } = await api.put('/auth/me', form);
       updateUser(data.data);
       toast.success('Hospital profile updated');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Profile update failed');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <DashboardLayout title="Hospital Profile">
+    <DashboardLayout title="Hospital Profile" loading={loading}>
       <form className="card grid gap-4 md:grid-cols-2" onSubmit={save}>
         <Field label="Hospital name"><input className="input-field" value={form.hospitalName} onChange={(e) => setForm({ ...form, hospitalName: e.target.value })} required /></Field>
         <Field label="Phone"><input className="input-field" value={form.phoneNumber} onChange={(e) => setForm({ ...form, phoneNumber: e.target.value })} required /></Field>
@@ -1542,27 +1562,31 @@ export const HospitalProfile = () => {
 
 export const AdminDashboard = () => {
   const navigate = useNavigate();
-  const { data } = useApi(async () => {
+  const { data, loading } = useApi(async () => {
     const [stats, analytics, inventory, pending] = await Promise.all([api.get('/admin/stats'), api.get('/admin/analytics'), api.get('/admin/inventory'), api.get('/admin/users?role=hospital&limit=5')]);
     return { stats: stats.data.data, analytics: analytics.data.data, inventory: inventory.data.data, pending: pending.data.data.filter((u) => !u.isApproved) };
   }, []);
   return (
-    <DashboardLayout title="Admin Dashboard">
-      <div className="page-grid">{['totalUsers', 'totalDonors', 'totalHospitals', 'totalBloodUnits', 'requestsToday', 'fulfilledToday', 'pendingHospitalApprovals'].map((key) => <StatCard key={key} label={key} value={data?.stats?.[key]} />)}</div>
-      {data?.inventory?.critical?.length > 0 && (
-        <div className="card mt-5 border-red-200 bg-red-50">
-          <h2 className="text-lg font-black text-red-800">Critical shortages</h2>
-          <div className="mt-3 grid gap-3">
-            {data.inventory.critical.map((item) => (
-              <div key={item.bloodGroup} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-100 bg-white p-3">
-                <div><BloodGroupBadge group={item.bloodGroup} size="sm" /><p className="mt-1 text-sm text-slate-600">{item.totalUnits || 0} units available</p></div>
-                <button className="btn-outline" onClick={() => navigate('/admin/broadcast', { state: { bloodGroup: item.bloodGroup } })}><Megaphone size={16} /> Broadcast Alert</button>
+    <DashboardLayout title="Admin Dashboard" loading={loading}>
+      {data && (
+        <>
+          <div className="page-grid">{['totalUsers', 'totalDonors', 'totalHospitals', 'totalBloodUnits', 'requestsToday', 'fulfilledToday', 'pendingHospitalApprovals'].map((key) => <StatCard key={key} label={key} value={data?.stats?.[key]} />)}</div>
+          {data?.inventory?.critical?.length > 0 && (
+            <div className="card mt-5 border-red-200 bg-red-50">
+              <h2 className="text-lg font-black text-red-800">Critical shortages</h2>
+              <div className="mt-3 grid gap-3">
+                {(data.inventory.critical || []).map((item) => (
+                  <div key={item.bloodGroup} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-100 bg-white p-3">
+                    <div><BloodGroupBadge group={item.bloodGroup} size="sm" /><p className="mt-1 text-sm text-slate-600">{item.totalUnits || 0} units available</p></div>
+                    <button className="btn-outline" onClick={() => navigate('/admin/broadcast', { state: { bloodGroup: item.bloodGroup } })}><Megaphone size={16} /> Broadcast Alert</button>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </div>
+            </div>
+          )}
+          <div className="mt-5 grid gap-5 lg:grid-cols-2"><Chart title="Donations By Month" data={data?.analytics?.donationsByMonth?.map((i) => ({ name: `${i._id.month}/${i._id.year}`, value: i.count })) || []} /><PieBox title="Blood Group Distribution" data={data?.analytics?.bloodGroupDistribution?.map((i) => ({ name: i._id, value: i.count })) || []} /></div>
+        </>
       )}
-      <div className="mt-5 grid gap-5 lg:grid-cols-2"><Chart title="Donations By Month" data={data?.analytics?.donationsByMonth?.map((i) => ({ name: `${i._id.month}/${i._id.year}`, value: i.count })) || []} /><PieBox title="Blood Group Distribution" data={data?.analytics?.bloodGroupDistribution?.map((i) => ({ name: i._id, value: i.count })) || []} /></div>
     </DashboardLayout>
   );
 };
@@ -1571,7 +1595,7 @@ export const UserManagement = () => {
   const [role, setRole] = useState('');
   const [suspending, setSuspending] = useState(null);
   const [reason, setReason] = useState('');
-  const { data, reload } = useApi(async () => (await api.get(`/admin/users?role=${role}`)).data.data, [role]);
+  const { data, reload, loading } = useApi(async () => (await api.get(`/admin/users?role=${role}`)).data.data, [role]);
   const action = async (id, name, body = {}) => { await api.put(`/admin/users/${id}/${name}`, body); toast.success(`User ${name}d`); reload(); };
   const openSuspend = (user) => {
     setSuspending(user);
@@ -1584,7 +1608,7 @@ export const UserManagement = () => {
     setSuspending(null);
   };
   return (
-    <DashboardLayout title="User Management">
+    <DashboardLayout title="User Management" loading={loading}>
       <div className="mb-4 flex flex-wrap gap-2">{['', 'donor', 'hospital', 'organization', 'admin'].map((r) => <button key={r || 'all'} className={role === r ? 'btn-primary' : 'btn-outline'} onClick={() => setRole(r)}>{r || 'All'}</button>)}</div>
       <PageTable headers={['Name', 'Email', 'Role', 'Status', 'Joined', 'Actions']} rows={(data || []).map((u) => <tr key={u._id}><td>{u.firstName} {u.lastName}</td><td>{u.email}</td><td><span className="role-badge">{u.role}</span></td><td><span className={`badge-pill ${u.isActive ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>{u.isActive ? 'Active' : 'Suspended'} {u.role === 'hospital' && !u.isApproved ? '/ Pending' : ''}</span></td><td>{fmtDate(u.createdAt)}</td><td className="flex gap-2">{u.role === 'hospital' && !u.isApproved && <button className="btn-outline" onClick={() => action(u._id, 'approve')}><ShieldCheck size={16} /> Approve</button>}<button className="btn-outline" onClick={() => u.isActive ? openSuspend(u) : action(u._id, 'activate')}>{u.isActive ? <XCircle size={16} /> : <CheckCircle size={16} />}{u.isActive ? 'Suspend' : 'Activate'}</button></td></tr>)} />
       {suspending && (
@@ -1605,16 +1629,16 @@ export const UserManagement = () => {
 };
 
 export const InventoryOverview = () => {
-  const { data } = useApi(async () => (await api.get('/admin/inventory')).data.data, []);
+  const { data, loading } = useApi(async () => (await api.get('/admin/inventory')).data.data, []);
   const chart = (data?.byBloodGroup || []).map((i) => ({ name: i._id, value: i.totalUnits }));
-  return <DashboardLayout title="Inventory Overview"><div className="page-grid mb-5">{chart.map((i) => <StatCard key={i.name} label={i.name} value={i.value} />)}</div><Chart title="Units Per Blood Group" data={chart} /></DashboardLayout>;
+  return <DashboardLayout title="Inventory Overview" loading={loading}><div className="page-grid mb-5">{chart.map((i) => <StatCard key={i.name} label={i.name} value={i.value} />)}</div><Chart title="Units Per Blood Group" data={chart} /></DashboardLayout>;
 };
 
 export const DonorAnalytics = () => {
-  const { data } = useApi(async () => (await api.get('/admin/analytics')).data.data, []);
+  const { data, loading } = useApi(async () => (await api.get('/admin/analytics')).data.data, []);
   const retention = data?.retentionRate || {};
   return (
-    <DashboardLayout title="Donor Analytics">
+    <DashboardLayout title="Donor Analytics" loading={loading}>
       <div className="grid gap-5 lg:grid-cols-2"><Chart title="Donations By Month" data={data?.donationsByMonth?.map((i) => ({ name: `${i._id.month}/${i._id.year}`, value: i.count })) || []} /><PieBox title="Retention" data={[{ name: 'Returning', value: retention.returning || 0 }, { name: 'One Time', value: retention.oneTime || 0 }]} /></div>
       <PageTable headers={['Name', 'Blood', 'Points', 'Donations']} rows={(data?.topDonors || []).map((u) => <tr key={u._id}><td>{u.firstName} {u.lastName}</td><td><BloodGroupBadge group={u.bloodGroup} size="sm" /></td><td>{u.points}</td><td>{u.totalDonations}</td></tr>)} />
     </DashboardLayout>
@@ -1630,16 +1654,20 @@ export const BroadcastAlerts = () => {
     title: prefillBloodGroup ? `${prefillBloodGroup} blood urgently needed` : '',
     message: prefillBloodGroup ? `BloodLink has a critical shortage of ${prefillBloodGroup}. Please donate if you are eligible.` : '',
   });
+  const [loading, setLoading] = useState(false);
   const send = async () => {
+    setLoading(true);
     try {
       const { data } = await api.post('/admin/broadcast', form);
       toast.success(data.message);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Broadcast failed');
+    } finally {
+      setLoading(false);
     }
   };
   return (
-    <DashboardLayout title="Broadcast Alerts">
+    <DashboardLayout title="Broadcast Alerts" loading={loading}>
       <div className="card grid gap-4">
         <select className="input-field" value={form.targetRole} onChange={(e) => setForm({ ...form, targetRole: e.target.value })}><option value="">All Users</option><option value="donor">All Donors</option><option value="hospital">All Hospitals</option></select>
         <select className="input-field" value={form.targetBloodGroup} onChange={(e) => setForm({ ...form, targetBloodGroup: e.target.value })}><option value="">Any Blood Group</option>{BLOOD_GROUPS.map((g) => <option key={g}>{g}</option>)}</select>

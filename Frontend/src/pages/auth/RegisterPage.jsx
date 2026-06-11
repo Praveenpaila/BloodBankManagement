@@ -7,6 +7,7 @@ import * as yup from 'yup';
 import api from '../../api/axios';
 import { useAuth } from '../../context/authStore';
 import { BLOOD_GROUPS } from '../../utils/bloodGroups';
+import LoadingSpinner from '../../components/common/LoadingSpinner';
 
 const schema = yup.object({
   firstName: yup.string().required('Name is required'),
@@ -22,11 +23,16 @@ const RegisterPage = () => {
   const [params] = useSearchParams();
   const defaultRole = params.get('role') || 'donor';
   const navigate = useNavigate();
-  const { register: createAccount, dashboardFor } = useAuth();
+  const { register: createAccount, dashboardFor, loading } = useAuth();
   const { register, handleSubmit, control, getValues, setValue, formState: { errors, isSubmitting } } = useForm({
     resolver: yupResolver(schema),
     defaultValues: { role: defaultRole, bloodGroup: 'O+', gender: 'male', otp: '' },
   });
+
+  if (loading) {
+    return <LoadingSpinner />;
+  }
+
   const role = useWatch({ control, name: 'role' });
 
   const sendOtp = async () => {

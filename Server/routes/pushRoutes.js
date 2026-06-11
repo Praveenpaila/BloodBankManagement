@@ -64,4 +64,52 @@ router.post("/unsubscribe", protect, async (req, res) => {
   }
 });
 
+// ─── Expo Push Token (mobile app) ────────────────────────────────────────────
+
+router.post("/expo-register", protect, async (req, res) => {
+  try {
+    const { token } = req.body;
+
+    if (!token || !token.startsWith("ExponentPushToken")) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid Expo push token is required",
+      });
+    }
+
+    // Clear this token from any other user (token is device-specific)
+    const UserModel = require("../models/user");
+    await UserModel.updateMany(
+      { expoPushToken: token, _id: { $ne: req.user._id } },
+      { $unset: { expoPushToken: "" } }
+    );
+
+    // Save to current user
+    await UserModel.findByIdAndUpdate(req.user._id, { expoPushToken: token });
+
+    return res.status(200).json({ success: true });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: err.message || "Error registering Expo push token",
+    });
+  }
+});
+
+router.post("/expo-unregister", protect, async (req, res) => {
+  try {
+    const UserModel = require("../models/user");
+    await UserModel.findByIdAndUpdate(req.user._id, {
+      $unset: { expoPushToken: "" },
+    });
+
+    return res.status(200).json({ success: true });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: err.message || "Error unregistering Expo push token",
+    });
+  }
+});
+
 module.exports = router;

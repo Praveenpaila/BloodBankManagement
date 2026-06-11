@@ -25,6 +25,23 @@ Backend:
 - API base path: `/api`
 - Realtime Socket.IO initialized in `Server/utils/realtime.js`
 
+## 1.1 Top-Level Screen Flow
+
+BloodLink has a role-based navigation flow where users start on public pages and then move into dashboards after authentication.
+
+- Public entry points: `/`, `/about`, `/search`, `/contact`, `/login`, `/register`, `/forgot-password`
+- After login, users are routed by role:
+  - Donor -> `/donor/dashboard`
+  - Hospital -> `/hospital/dashboard`
+  - Admin -> `/admin/dashboard`
+- Donor path: dashboard -> eligibility -> appointments, donation history, badges, notifications, nearby requests, blood finder, SOS request, chat
+- Hospital path: dashboard -> inventory -> raise request -> request status -> donor search -> expiry alerts -> appointments -> profile -> notifications -> chat
+- Admin path: dashboard -> user management -> inventory overview -> request log -> analytics -> broadcast alerts -> system settings -> reports
+- Realtime and API-driven flows:
+  - New blood requests notify nearby donors with `blood-request:new`
+  - Accepted requests create a chat and notify requester/donor
+  - Request status changes propagate via socket events and update dashboards
+
 ## 2. Public Screens
 
 ### `/`

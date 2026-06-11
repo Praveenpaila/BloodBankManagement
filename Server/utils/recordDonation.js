@@ -3,6 +3,7 @@ const UserModel = require("../models/user");
 const { awardPoints } = require("../controllers/loyaltyController");
 const { deferDonorAfterDonation } = require("./eligibilityDeferral");
 const { emitToUser } = require("./realtime");
+const { sendExpoPushToUsers } = require("./expoPush");
 
 const generateCertificateId = () =>
   `BL-${Date.now()}${Math.floor(Math.random() * 9000 + 1000)}`;
@@ -102,6 +103,15 @@ const recordCompletedDonation = async ({
   emitToUser(donorId, "eligibility:deferred", {
     bloodRequestId,
     deferralUntil,
+  });
+
+  // Expo push for donation recorded
+  sendExpoPushToUsers([donorId], {
+    title: "🎉 Donation recorded!",
+    body: `+${pointsAwarded} points earned. Total donations: ${user?.totalDonations || 0}. You are deferred for 30 days.`,
+    data: { screen: "donor:history" },
+    channelId: "bloodlink-default",
+    priority: "high",
   });
 
   return {

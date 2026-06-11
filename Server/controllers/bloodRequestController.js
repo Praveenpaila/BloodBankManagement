@@ -7,6 +7,7 @@ const ChatConversation = require("../models/ChatConversation");
 const { transporter } = require("./auth");
 const { emitToRequest, emitToUser } = require("../utils/realtime");
 const { sendPushNotification } = require("../utils/webPush");
+const { sendExpoPushToUsers } = require("../utils/expoPush");
 const { recordCompletedDonation } = require("../utils/recordDonation");
 const { rankDonorsByShortestPath } = require("../utils/geoRouting");
 const { haversineKm, roundKm } = require("../utils/haversine");
@@ -158,6 +159,17 @@ exports.createRequest = async (req, res) => {
 
     notifications.forEach((notification) => {
       if (notification?.recipient) emitToUser(notification.recipient, "blood-request:new", notification);
+    });
+
+    // ── Expo Push to all notified donors ──────────────────────────────────────
+    const donorIdsForPush = rankedDonors.map(({ donor }) => donor._id);
+    sendExpoPushToUsers(donorIdsForPush, {
+      title: `🩸 ${urgency === "critical" ? "SOS: " : ""}${bloodGroup} blood needed`,
+      body: `${req.user.firstName} needs ${requestedUnits} unit(s). Open BloodLink to respond.`,
+      data: { screen: "donor:nearby", requestId: String(request._id) },
+      channelId: urgency === "critical" ? "bloodlink-sos" : "bloodlink-default",
+      priority: "high",
+      sound: "default",
     });
 
     if (process.env.VAPID_PUBLIC_KEY) {
@@ -373,6 +385,15 @@ exports.respondToRequest = async (req, res) => {
 
     emitToUser(request.requestedBy, "blood-request:response", responseNotification);
 
+    // Expo push to requester
+    sendExpoPushToUsers([request.requestedBy], {
+      title: `Donor ${action}ed your request`,
+      body: `${req.user.firstName} ${req.user.lastName} ${action}ed your blood request`,
+      data: { screen: "hospital:requests", requestId: String(request._id) },
+      channelId: "bloodlink-default",
+      priority: "high",
+    });
+
     let conversation = null;
     if (action === "accept") {
       conversation = await ChatConversation.findOneAndUpdate(
@@ -425,6 +446,14 @@ exports.respondToRequest = async (req, res) => {
             acceptedDonorName: `${req.user.firstName || ""} ${req.user.lastName || ""}`.trim(),
             message: `${req.user.firstName} accepted this request.`,
           });
+        });
+
+        // Expo push to other donors: request covered
+        sendExpoPushToUsers(otherDonors, {
+          title: `${request.bloodGroup} request covered`,
+          body: `${req.user.firstName} accepted this request. Thanks for being ready.`,
+          data: { screen: "donor:notifications" },
+          channelId: "bloodlink-default",
         });
       }
 
@@ -521,6 +550,16 @@ exports.updateRequestStatus = async (req, res) => {
             reopened: true,
           },
         });
+      });
+
+      // Expo push: request reopened
+      sendExpoPushToUsers(request.notifiedDonors || [], {
+        title: `🩸 ${request.bloodGroup} blood needed (reopened)`,
+        body: "This blood request is open again. Please respond if you can help.",
+        data: { screen: "donor:nearby", requestId: String(request._id) },
+        channelId: request.urgency === "critical" ? "bloodlink-sos" : "bloodlink-default",
+        priority: "high",
+        sound: "default",
       });
     }
 

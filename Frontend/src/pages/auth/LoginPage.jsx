@@ -5,6 +5,7 @@ import { Droplet, LogIn, UserPlus } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as yup from 'yup';
 import { useAuth } from '../../context/authStore';
+import LoadingSpinner from '../../components/common/LoadingSpinner';
 
 const schema = yup.object({
   email: yup.string().email('Enter a valid email').required('Email is required'),
@@ -13,8 +14,12 @@ const schema = yup.object({
 
 const LoginPage = () => {
   const navigate = useNavigate();
-  const { login, isAuthenticated, user, dashboardFor } = useAuth();
+  const { login, isAuthenticated, user, dashboardFor, loading } = useAuth();
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm({ resolver: yupResolver(schema) });
+
+  if (loading) {
+    return <LoadingSpinner />;
+  }
 
   if (isAuthenticated) {
     return <Navigate to={dashboardFor(user.role)} replace />;

@@ -29,10 +29,16 @@
         {
           "locationWhenInUsePermission": "BloodLink uses your location to match nearby blood requests and donors."
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "sounds": []
+        }
       ]
     ],
     "extra": {
-      "apiUrl": "http://10.0.2.2:3000/api"
+      "apiUrl": "http://172.18.220.69:3000/api"
     }
   }
 }

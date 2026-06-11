@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { useAuth } from './context/authStore';
 import ProtectedRoute from './components/common/ProtectedRoute';
+import LoadingSpinner from './components/common/LoadingSpinner';
 import LandingPage from './pages/public/LandingPage';
 import AboutPage from './pages/public/AboutPage';
 import PublicSearchPage from './pages/public/PublicSearchPage';
@@ -43,7 +44,7 @@ import {
 const RoleRedirect = () => {
   const { isAuthenticated, user, dashboardFor, loading } = useAuth();
 
-  if (loading) return null;
+  if (loading) return <LoadingSpinner />;
   if (!isAuthenticated) return <LandingPage />;
   if (user.role === 'hospital' && user.isApproved === false) return <Navigate to="/hospital/pending" replace />;
   return <Navigate to={dashboardFor(user.role)} replace />;

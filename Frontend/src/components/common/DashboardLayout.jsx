@@ -1,8 +1,9 @@
 import Navbar from './Navbar';
 import Sidebar from './Sidebar';
 import { useAuth } from '../../context/authStore';
+import LoadingSpinner from './LoadingSpinner';
 
-const DashboardLayout = ({ title, subtitle, children }) => {
+const DashboardLayout = ({ title, subtitle, loading = false, children }) => {
   const { user } = useAuth();
 
   return (
@@ -16,7 +17,7 @@ const DashboardLayout = ({ title, subtitle, children }) => {
               <h1 className="text-2xl font-black text-slate-900">{title}</h1>
               {subtitle && <p className="mt-1 text-sm text-slate-500">{subtitle}</p>}
             </div>
-            {children}
+            {loading ? <LoadingSpinner /> : children}
           </div>
         </main>
       </div>
